@@ -10,13 +10,24 @@ using namespace DirectX;
 enum class RenderLayer : int
 {
 	Opaque = 0,
+	Transparent,
+	AlphaTested,
 	Sky,
+	UI,
+
+	DepthComplexity1,
+	DepthComplexity2,
+	DepthComplexity3,
+	DepthComplexity4,
+	DepthComplexity5,
+
 	Count
 };
 
 struct ObjectConstants
 {
 	DirectX::XMFLOAT4X4 World = MathHelper::Identity4x4();
+	DirectX::XMFLOAT4X4 InverseTransposeWorld = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 TexTransform = MathHelper::Identity4x4();
 	UINT     MaterialIndex;
 	UINT     ObjPad0;
@@ -48,7 +59,7 @@ public:
 	XMFLOAT3 mScale = XMFLOAT3(1.0f, 1.0f, 1.0f);
 
 	Material* mMat = nullptr;
-	XMFLOAT3 mTexTransform = XMFLOAT3(1.0f, 1.0f, 1.0f);
+	XMFLOAT4X4 mTexTransform = MathHelper::Identity4x4();
 
 	Mesh* mGeo = nullptr;
 	D3D12_PRIMITIVE_TOPOLOGY mPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;

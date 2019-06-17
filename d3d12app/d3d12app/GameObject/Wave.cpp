@@ -198,4 +198,22 @@ void Wave::Update(const GameTimer& gt)
 	// 将波浪渲染项的动态顶点缓冲设置为当前帧的顶点缓冲
 	mGeo->VertexBufferGPU = currWavesVB->Resource();
 	mGeo->VertexBufferView.BufferLocation = mGeo->VertexBufferGPU->GetGPUVirtualAddress();
+
+	// 更新纹理转换矩阵，营造一种流动的感觉
+	float& tu = mMat->mMatTransform(3, 0);
+	float& tv = mMat->mMatTransform(3, 1);
+
+	tu += 0.1f * gt.DeltaTime();
+	tv += 0.02f * gt.DeltaTime();
+
+	if (tu >= 1.0f)
+		tu -= 1.0f;
+
+	if (tv >= 1.0f)
+		tv -= 1.0f;
+
+	mMat->mMatTransform(3, 0) = tu;
+	mMat->mMatTransform(3, 1) = tv;
+
+	mMat->Change();
 }

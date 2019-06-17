@@ -30,11 +30,16 @@ public:
 private:
 	virtual void OnResize()override;
 	virtual void Update(const GameTimer& gt)override;
+
 	virtual void Draw(const GameTimer& gt)override;
+
 
 	virtual void OnMouseDown(WPARAM btnState, int x, int y)override;
 	virtual void OnMouseUp(WPARAM btnState, int x, int y)override;
 	virtual void OnMouseMove(WPARAM btnState, int x, int y)override;
+
+	virtual void OnKeyDown(WPARAM vkCode)override;
+	virtual void OnKeyUp(WPARAM vkCode)override;
 
 	void OnKeyboardInput(const GameTimer& gt);
 
@@ -67,8 +72,10 @@ private:
 
 	Camera mCamera;
 
-	bool mIsWireframe = false;
-
 	POINT mLastMousePos;
+
+	bool mIsWireframe = false;
+	bool mIsDepthComplexity = false;
+	bool mIsDepthComplexityBlend = false;
 };
 

@@ -46,6 +46,9 @@ protected:
 	virtual void OnMouseUp(WPARAM btnState, int x, int y) { }
 	virtual void OnMouseMove(WPARAM btnState, int x, int y) { }
 
+	virtual void OnKeyDown(WPARAM vkCode) { }
+	virtual void OnKeyUp(WPARAM vkCode) { }
+
 protected:
 
 	bool InitMainWindow();//初始化主窗口

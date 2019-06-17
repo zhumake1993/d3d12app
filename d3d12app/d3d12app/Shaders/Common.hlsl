@@ -44,6 +44,7 @@ SamplerState gsamAnisotropicClamp : register(s5);
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
+	float4x4 gInvTraWorld;
 	float4x4 gTexTransform;
 	uint gMaterialIndex;
 	uint gObjPad0;
@@ -68,6 +69,12 @@ cbuffer cbPass : register(b1)
     float gTotalTime;
     float gDeltaTime;
     float4 gAmbientLight;
+
+	// 允许用户每帧改变雾的参数
+	float4 gFogColor;
+	float gFogStart;
+	float gFogRange;
+	float2 cbPerObjectPad2;
 
 	// 索引 [0, NUM_DIR_LIGHTS) 是平行光
 	// 索引 [NUM_DIR_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHTS) 是点光

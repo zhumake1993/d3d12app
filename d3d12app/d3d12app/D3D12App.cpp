@@ -88,11 +88,7 @@ void D3D12App::Draw(const GameTimer& gt)
 	//重置指令列表以重用内存
 	//必须在使用ExecuteCommandList将指令列表添加进指令队列后才能执行该操作
 	//ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque"].Get()));
-	if (mIsWireframe) {
-		ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque_wireframe"].Get()));
-	} else {
-		ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque"].Get()));
-	}
+	ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque"].Get()));
 
 	//改变资源的状态
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
@@ -130,10 +126,55 @@ void D3D12App::Draw(const GameTimer& gt)
 	// 绑定天空球立方体贴图
 	mCommandList->SetGraphicsRootDescriptorTable(3, mTextureManager->GetGpuSrvCube());
 
-	mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Opaque);
+	if (mIsWireframe) {
+		mCommandList->SetPipelineState(mPSOs["opaque_wireframe"].Get());
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Opaque);
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::AlphaTested);
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Transparent);
 
-	mCommandList->SetPipelineState(mPSOs["sky"].Get());
-	mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Sky);
+	} 
+	else if (mIsDepthComplexity) {
+		mCommandList->SetPipelineState(mPSOs["countDepthComplexity"].Get());
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Opaque);
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::AlphaTested);
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Transparent);
+
+		mCommandList->SetPipelineState(mPSOs["showDepthComplexity"].Get());
+
+		mCommandList->OMSetStencilRef(1);
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::DepthComplexity1);
+
+		mCommandList->OMSetStencilRef(2);
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::DepthComplexity2);
+
+		mCommandList->OMSetStencilRef(3);
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::DepthComplexity3);
+
+		mCommandList->OMSetStencilRef(4);
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::DepthComplexity4);
+
+		mCommandList->OMSetStencilRef(5);
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::DepthComplexity5);
+	}
+	else if (mIsDepthComplexityBlend) {
+		mCommandList->SetPipelineState(mPSOs["showDepthComplexityUseBlend"].Get());
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Opaque);
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::AlphaTested);
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Transparent);
+	}
+	else {
+		mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Opaque);
+
+		mCommandList->SetPipelineState(mPSOs["alphaTested"].Get());
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::AlphaTested);
+
+		mCommandList->SetPipelineState(mPSOs["transparent"].Get());
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Transparent);
+
+		mCommandList->SetPipelineState(mPSOs["sky"].Get());
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Sky);
+	}
 
 
 
@@ -188,6 +229,26 @@ void D3D12App::OnMouseMove(WPARAM btnState, int x, int y)
 	mLastMousePos.y = y;
 }
 
+void D3D12App::OnKeyDown(WPARAM vkCode)
+{
+	if (vkCode == '1')
+		mIsWireframe = !mIsWireframe;
+
+	if (vkCode == '2') {
+		mIsDepthComplexity = !mIsDepthComplexity;
+		mIsDepthComplexityBlend = false;
+	}
+
+	if (vkCode == '3') {
+		mIsDepthComplexity = false;
+		mIsDepthComplexityBlend = !mIsDepthComplexityBlend;
+	}
+}
+
+void D3D12App::OnKeyUp(WPARAM vkCode)
+{
+}
+
 void D3D12App::OnKeyboardInput(const GameTimer& gt)
 {
 	const float dt = gt.DeltaTime();
@@ -209,11 +270,6 @@ void D3D12App::OnKeyboardInput(const GameTimer& gt)
 
 	if (GetAsyncKeyState('E') & 0x8000)
 		mCamera.FlyDown(10.0f * dt);
-
-	if (GetAsyncKeyState('1') & 0x8000)
-		mIsWireframe = true;
-	else
-		mIsWireframe = false;
 }
 
 void D3D12App::UpdateFrameResource(const GameTimer& gt)
@@ -256,15 +312,18 @@ void D3D12App::BuildTextures()
 {
 	std::vector<std::wstring> fileNames =
 	{
+		L"Textures/bricks.dds",
 		L"Textures/bricks2.dds",
 		L"Textures/bricks2_nmap.dds",
+		L"Textures/stone.dds",
 		L"Textures/tile.dds",
 		L"Textures/tile_nmap.dds",
 		L"Textures/white1x1.dds",
 		L"Textures/default_nmap.dds",
 		L"Textures/grass.dds",
 		L"Textures/water1.dds",
-		L"Textures/WoodCrate01.dds"
+		L"Textures/WoodCrate01.dds",
+		L"Textures/WireFence.dds"
 	};
 
 	std::wstring cubeMapFileName = L"Textures/snowcube1024.dds";
@@ -279,17 +338,35 @@ void D3D12App::BuildTextures()
 
 void D3D12App::BuildMaterials()
 {
-	auto bricks0 = std::make_unique<Material>();
-	bricks0->mName = "bricks0";
-	bricks0->mDiffuseIndex = mTextureManager->mTextures["bricks2"]->Index;
-	bricks0->mNormalIndex = mTextureManager->mTextures["bricks2_nmap"]->Index;
-	bricks0->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	bricks0->mFresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
-	bricks0->mRoughness = 0.3f;
-	mMaterialManager->AddMaterial(std::move(bricks0));
+	auto bricks = std::make_unique<Material>();
+	bricks->mName = "bricks";
+	bricks->mDiffuseIndex = mTextureManager->mTextures["bricks"]->Index;
+	bricks->mNormalIndex = mTextureManager->mTextures["default_nmap"]->Index;
+	bricks->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	bricks->mFresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
+	bricks->mRoughness = 0.1f;
+	mMaterialManager->AddMaterial(std::move(bricks));
+
+	auto bricks2 = std::make_unique<Material>();
+	bricks2->mName = "bricks2";
+	bricks2->mDiffuseIndex = mTextureManager->mTextures["bricks2"]->Index;
+	bricks2->mNormalIndex = mTextureManager->mTextures["bricks2_nmap"]->Index;
+	bricks2->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	bricks2->mFresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+	bricks2->mRoughness = 0.3f;
+	mMaterialManager->AddMaterial(std::move(bricks2));
+
+	auto stone = std::make_unique<Material>();
+	stone->mName = "stone";
+	stone->mDiffuseIndex = mTextureManager->mTextures["stone"]->Index;
+	stone->mNormalIndex = mTextureManager->mTextures["default_nmap"]->Index;
+	stone->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	stone->mFresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
+	stone->mRoughness = 0.1f;
+	mMaterialManager->AddMaterial(std::move(stone));
 
 	auto tile0 = std::make_unique<Material>();
-	tile0->mName = "tile0";
+	tile0->mName = "tile";
 	tile0->mDiffuseIndex = mTextureManager->mTextures["tile"]->Index;
 	tile0->mNormalIndex = mTextureManager->mTextures["tile_nmap"]->Index;
 	tile0->mDiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
@@ -298,7 +375,7 @@ void D3D12App::BuildMaterials()
 	mMaterialManager->AddMaterial(std::move(tile0));
 
 	auto mirror0 = std::make_unique<Material>();
-	mirror0->mName = "mirror0";
+	mirror0->mName = "mirror";
 	mirror0->mDiffuseIndex = mTextureManager->mTextures["white1x1"]->Index;
 	mirror0->mNormalIndex = mTextureManager->mTextures["default_nmap"]->Index;
 	mirror0->mDiffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -328,19 +405,64 @@ void D3D12App::BuildMaterials()
 	water->mName = "water";
 	water->mDiffuseIndex = mTextureManager->mTextures["water1"]->Index;
 	water->mNormalIndex = mTextureManager->mTextures["default_nmap"]->Index;
-	water->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	water->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
 	water->mFresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	water->mRoughness = 0.0f;
 	mMaterialManager->AddMaterial(std::move(water));
 
 	auto wirefence = std::make_unique<Material>();
 	wirefence->mName = "wirefence";
-	wirefence->mDiffuseIndex = mTextureManager->mTextures["WoodCrate01"]->Index;
+	wirefence->mDiffuseIndex = mTextureManager->mTextures["WireFence"]->Index;
 	wirefence->mNormalIndex = mTextureManager->mTextures["default_nmap"]->Index;
 	wirefence->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	wirefence->mFresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	wirefence->mRoughness = 0.25f;
 	mMaterialManager->AddMaterial(std::move(wirefence));
+
+	auto DepthComplexityColor1 = std::make_unique<Material>();
+	DepthComplexityColor1->mName = "DepthComplexityColor1";
+	DepthComplexityColor1->mDiffuseIndex = -1;
+	DepthComplexityColor1->mNormalIndex = -1;
+	DepthComplexityColor1->mDiffuseAlbedo = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	DepthComplexityColor1->mFresnelR0 = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	DepthComplexityColor1->mRoughness = -1;
+	mMaterialManager->AddMaterial(std::move(DepthComplexityColor1));
+
+	auto DepthComplexityColor2 = std::make_unique<Material>();
+	DepthComplexityColor2->mName = "DepthComplexityColor2";
+	DepthComplexityColor2->mDiffuseIndex = -1;
+	DepthComplexityColor2->mNormalIndex = -1;
+	DepthComplexityColor2->mDiffuseAlbedo = XMFLOAT4(0.4f, 0.4f, 0.4f, 1.0f);
+	DepthComplexityColor2->mFresnelR0 = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	DepthComplexityColor2->mRoughness = -1;
+	mMaterialManager->AddMaterial(std::move(DepthComplexityColor2));
+
+	auto DepthComplexityColor3 = std::make_unique<Material>();
+	DepthComplexityColor3->mName = "DepthComplexityColor3";
+	DepthComplexityColor3->mDiffuseIndex = -1;
+	DepthComplexityColor3->mNormalIndex = -1;
+	DepthComplexityColor3->mDiffuseAlbedo = XMFLOAT4(0.6f, 0.6f, 0.6f, 1.0f);
+	DepthComplexityColor3->mFresnelR0 = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	DepthComplexityColor3->mRoughness = -1;
+	mMaterialManager->AddMaterial(std::move(DepthComplexityColor3));
+
+	auto DepthComplexityColor4 = std::make_unique<Material>();
+	DepthComplexityColor4->mName = "DepthComplexityColor4";
+	DepthComplexityColor4->mDiffuseIndex = -1;
+	DepthComplexityColor4->mNormalIndex = -1;
+	DepthComplexityColor4->mDiffuseAlbedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
+	DepthComplexityColor4->mFresnelR0 = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	DepthComplexityColor4->mRoughness = -1;
+	mMaterialManager->AddMaterial(std::move(DepthComplexityColor4));
+
+	auto DepthComplexityColor5 = std::make_unique<Material>();
+	DepthComplexityColor5->mName = "DepthComplexityColor5";
+	DepthComplexityColor5->mDiffuseIndex = -1;
+	DepthComplexityColor5->mNormalIndex = -1;
+	DepthComplexityColor5->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	DepthComplexityColor5->mFresnelR0 = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	DepthComplexityColor5->mRoughness = -1;
+	mMaterialManager->AddMaterial(std::move(DepthComplexityColor5));
 }
 
 void D3D12App::BuildMeshes()
@@ -350,6 +472,7 @@ void D3D12App::BuildMeshes()
 	mMeshManager->AddGeometry("grid", geoGen.CreateGrid(20.0f, 30.0f, 60, 40));
 	mMeshManager->AddGeometry("sphere", geoGen.CreateSphere(0.5f, 20, 20));
 	mMeshManager->AddGeometry("cylinder", geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20));
+	mMeshManager->AddGeometry("quad", geoGen.CreateQuad(-1.0f, 1.0f, 2.0f, 2.0, 0.0));
 
 	auto hill = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
 	for (auto& v : hill.Vertices) {
@@ -400,9 +523,11 @@ void D3D12App::BuildMeshes()
 	wave->mName = "wave";
 	wave->mTranslation = XMFLOAT3(0.0f, -20.0f, 0.0f);
 	wave->mMat = mMaterialManager->mMaterials["water"].get();
-	wave->mTexTransform = XMFLOAT3(5.0f, 5.0f, 1.0f);
+	XMStoreFloat4x4(&wave->mTexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
 	wave->mGeo = mMeshManager->mGeometries["wave"].get();
-	mInstanceManager->AddInstance(std::move(wave), (int)RenderLayer::Opaque);
+	mInstanceManager->AddInstance(std::move(wave), (int)RenderLayer::Transparent);
+
+	mMeshManager->AddGeometry("box2", geoGen.CreateBox(8.0f, 8.0f, 8.0f, 3));
 }
 
 void D3D12App::BuildInstances()
@@ -418,8 +543,8 @@ void D3D12App::BuildInstances()
 	box->mName = "box";
 	box->mTranslation = XMFLOAT3(0.0f, 0.5f, 0.0f);
 	box->mScale = XMFLOAT3(2.0f, 1.0f, 2.0f);
-	box->mMat = mMaterialManager->mMaterials["bricks0"].get();
-	box->mTexTransform = XMFLOAT3(1.0f, 0.5f, 1.0f);
+	box->mMat = mMaterialManager->mMaterials["bricks2"].get();
+	XMStoreFloat4x4(&box->mTexTransform, XMMatrixScaling(1.0f, 0.5f, 1.0f));
 	box->mGeo = mMeshManager->mGeometries["box"].get();
 	mInstanceManager->AddInstance(std::move(box), (int)RenderLayer::Opaque);
 
@@ -427,14 +552,14 @@ void D3D12App::BuildInstances()
 	globe->mName = "globe";
 	globe->mTranslation = XMFLOAT3(0.0f, 2.0f, 0.0f);
 	globe->mScale = XMFLOAT3(2.0f, 2.0f, 2.0f);
-	globe->mMat = mMaterialManager->mMaterials["mirror0"].get();
+	globe->mMat = mMaterialManager->mMaterials["mirror"].get();
 	globe->mGeo = mMeshManager->mGeometries["sphere"].get();
 	mInstanceManager->AddInstance(std::move(globe), (int)RenderLayer::Opaque);
 
 	auto grid = std::make_unique<Instance>();
 	grid->mName = "grid";
-	grid->mMat = mMaterialManager->mMaterials["tile0"].get();
-	grid->mTexTransform = XMFLOAT3(8.0f, 8.0f, 1.0f);
+	grid->mMat = mMaterialManager->mMaterials["tile"].get();
+	XMStoreFloat4x4(&grid->mTexTransform, XMMatrixScaling(8.0f, 8.0f, 1.0f));
 	grid->mGeo = mMeshManager->mGeometries["grid"].get();
 	mInstanceManager->AddInstance(std::move(grid), (int)RenderLayer::Opaque);
 
@@ -443,30 +568,30 @@ void D3D12App::BuildInstances()
 		auto leftCyl = std::make_unique<Instance>();
 		leftCyl->mName = "leftCyl";
 		leftCyl->mTranslation = XMFLOAT3(-5.0f, 1.5f, -10.0f + i * 5.0f);
-		leftCyl->mMat = mMaterialManager->mMaterials["bricks0"].get();
-		leftCyl->mTexTransform = XMFLOAT3(1.5f, 2.0f, 1.0f);
+		leftCyl->mMat = mMaterialManager->mMaterials["bricks"].get();
+		XMStoreFloat4x4(&leftCyl->mTexTransform, XMMatrixScaling(1.5f, 2.0f, 1.0f));
 		leftCyl->mGeo = mMeshManager->mGeometries["cylinder"].get();
 		mInstanceManager->AddInstance(std::move(leftCyl), (int)RenderLayer::Opaque);
 
 		auto rightCyl = std::make_unique<Instance>();
 		rightCyl->mName = "rightCyl";
 		rightCyl->mTranslation = XMFLOAT3(+5.0f, 1.5f, -10.0f + i * 5.0f);
-		rightCyl->mMat = mMaterialManager->mMaterials["bricks0"].get();
-		rightCyl->mTexTransform = XMFLOAT3(1.5f, 2.0f, 1.0f);
+		rightCyl->mMat = mMaterialManager->mMaterials["bricks"].get();
+		XMStoreFloat4x4(&rightCyl->mTexTransform, XMMatrixScaling(1.5f, 2.0f, 1.0f));
 		rightCyl->mGeo = mMeshManager->mGeometries["cylinder"].get();
 		mInstanceManager->AddInstance(std::move(rightCyl), (int)RenderLayer::Opaque);
 
 		auto leftSphere = std::make_unique<Instance>();
 		leftSphere->mName = "leftSphere";
 		leftSphere->mTranslation = XMFLOAT3(-5.0f, 3.5f, -10.0f + i * 5.0f);
-		leftSphere->mMat = mMaterialManager->mMaterials["mirror0"].get();
+		leftSphere->mMat = mMaterialManager->mMaterials["stone"].get();
 		leftSphere->mGeo = mMeshManager->mGeometries["sphere"].get();
 		mInstanceManager->AddInstance(std::move(leftSphere), (int)RenderLayer::Opaque);
 
 		auto rightSphere = std::make_unique<Instance>();
 		rightSphere->mName = "rightSphere";
 		rightSphere->mTranslation = XMFLOAT3(+5.0f, 3.5f, -10.0f + i * 5.0f);
-		rightSphere->mMat = mMaterialManager->mMaterials["mirror0"].get();
+		rightSphere->mMat = mMaterialManager->mMaterials["stone"].get();
 		rightSphere->mGeo = mMeshManager->mGeometries["sphere"].get();
 		mInstanceManager->AddInstance(std::move(rightSphere), (int)RenderLayer::Opaque);
 	}
@@ -475,9 +600,46 @@ void D3D12App::BuildInstances()
 	hill->mName = "hill";
 	hill->mTranslation = XMFLOAT3(0.0f, -20.0f, 0.0f);
 	hill->mMat = mMaterialManager->mMaterials["grass"].get();
-	hill->mTexTransform = XMFLOAT3(5.0f, 5.0f, 1.0f);
+	XMStoreFloat4x4(&hill->mTexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
 	hill->mGeo = mMeshManager->mGeometries["hill"].get();
 	mInstanceManager->AddInstance(std::move(hill), (int)RenderLayer::Opaque);
+
+	auto box2 = std::make_unique<Instance>();
+	box2->mName = "box2";
+	box2->mTranslation = XMFLOAT3(3.0f, -18.0f, -9.0f);
+	box2->mMat = mMaterialManager->mMaterials["wirefence"].get();
+	box2->mGeo = mMeshManager->mGeometries["box2"].get();
+	mInstanceManager->AddInstance(std::move(box2), (int)RenderLayer::AlphaTested);
+
+	auto DepthComplexityQuad1 = std::make_unique<Instance>();
+	DepthComplexityQuad1->mName = "DepthComplexityQuad1";
+	DepthComplexityQuad1->mMat = mMaterialManager->mMaterials["DepthComplexityColor1"].get();
+	DepthComplexityQuad1->mGeo = mMeshManager->mGeometries["quad"].get();
+	mInstanceManager->AddInstance(std::move(DepthComplexityQuad1), (int)RenderLayer::DepthComplexity1);
+
+	auto DepthComplexityQuad2 = std::make_unique<Instance>();
+	DepthComplexityQuad2->mName = "DepthComplexityQuad2";
+	DepthComplexityQuad2->mMat = mMaterialManager->mMaterials["DepthComplexityColor2"].get();
+	DepthComplexityQuad2->mGeo = mMeshManager->mGeometries["quad"].get();
+	mInstanceManager->AddInstance(std::move(DepthComplexityQuad2), (int)RenderLayer::DepthComplexity2);
+
+	auto DepthComplexityQuad3 = std::make_unique<Instance>();
+	DepthComplexityQuad3->mName = "DepthComplexityQuad3";
+	DepthComplexityQuad3->mMat = mMaterialManager->mMaterials["DepthComplexityColor3"].get();
+	DepthComplexityQuad3->mGeo = mMeshManager->mGeometries["quad"].get();
+	mInstanceManager->AddInstance(std::move(DepthComplexityQuad3), (int)RenderLayer::DepthComplexity3);
+
+	auto DepthComplexityQuad4 = std::make_unique<Instance>();
+	DepthComplexityQuad4->mName = "DepthComplexityQuad4";
+	DepthComplexityQuad4->mMat = mMaterialManager->mMaterials["DepthComplexityColor4"].get();
+	DepthComplexityQuad4->mGeo = mMeshManager->mGeometries["quad"].get();
+	mInstanceManager->AddInstance(std::move(DepthComplexityQuad4), (int)RenderLayer::DepthComplexity4);
+
+	auto DepthComplexityQuad5 = std::make_unique<Instance>();
+	DepthComplexityQuad5->mName = "DepthComplexityQuad5";
+	DepthComplexityQuad5->mMat = mMaterialManager->mMaterials["DepthComplexityColor5"].get();
+	DepthComplexityQuad5->mGeo = mMeshManager->mGeometries["quad"].get();
+	mInstanceManager->AddInstance(std::move(DepthComplexityQuad5), (int)RenderLayer::DepthComplexity5);
 }
 
 void D3D12App::BuildRootSignature()
@@ -521,8 +683,28 @@ void D3D12App::BuildRootSignature()
 
 void D3D12App::BuildShadersAndInputLayout()
 {
+	const D3D_SHADER_MACRO defines[] =
+	{
+		"FOG", "1",
+		NULL, NULL
+	};
+
+	const D3D_SHADER_MACRO alphaTestDefines[] =
+	{
+		"FOG", "1",
+		"ALPHA_TEST", "1",
+		NULL, NULL
+	};
+
 	mShaders["standardVS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["opaquePS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", nullptr, "PS", "ps_5_1");
+	mShaders["opaquePS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", defines, "PS", "ps_5_1");
+	mShaders["alphaTestedPS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
+
+	mShaders["UIVS"] = d3dUtil::CompileShader(L"Shaders\\UI.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["UIPS"] = d3dUtil::CompileShader(L"Shaders\\UI.hlsl", nullptr, "PS", "ps_5_1");
+
+	mShaders["GreyVS"] = d3dUtil::CompileShader(L"Shaders\\Grey.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["GreyPS"] = d3dUtil::CompileShader(L"Shaders\\Grey.hlsl", nullptr, "PS", "ps_5_1");
 
 	mShaders["skyVS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["skyPS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "PS", "ps_5_1");
@@ -538,8 +720,10 @@ void D3D12App::BuildShadersAndInputLayout()
 
 void D3D12App::BuildPSOs()
 {
+	//
+	// 不透明物体的PSO
+	//
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
-
 	ZeroMemory(&opaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 	opaquePsoDesc.InputLayout = { mInputLayout.data(), (UINT)mInputLayout.size() };
 	opaquePsoDesc.pRootSignature = mRootSignature.Get();
@@ -565,10 +749,160 @@ void D3D12App::BuildPSOs()
 	opaquePsoDesc.DSVFormat = mDepthStencilFormat;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaque"])));
 
+	//
 	// 不透明线框物体的PSO
+	//
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaqueWireframePsoDesc = opaquePsoDesc;
 	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&mPSOs["opaque_wireframe"])));
+
+	//
+	// 透明物体
+	//
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPsoDesc = opaquePsoDesc;
+
+	D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
+	transparencyBlendDesc.BlendEnable = true;
+	transparencyBlendDesc.LogicOpEnable = false;
+	transparencyBlendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	transparencyBlendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	transparencyBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+	transparencyBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+	transparencyBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+	transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	transparencyBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+	transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	transparentPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&mPSOs["transparent"])));
+
+	//
+	// alpha测试物体
+	//
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC alphaTestedPsoDesc = opaquePsoDesc;
+	alphaTestedPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["alphaTestedPS"]->GetBufferPointer()),
+		mShaders["alphaTestedPS"]->GetBufferSize()
+	};
+	alphaTestedPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(&mPSOs["alphaTested"])));
+
+	//
+	// 计算深度复杂度（使用模板缓冲）
+	//
+	CD3DX12_BLEND_DESC countDepthComplexityBlendState(D3D12_DEFAULT);
+	countDepthComplexityBlendState.RenderTarget[0].RenderTargetWriteMask = 0;
+
+	D3D12_DEPTH_STENCIL_DESC countDepthComplexityDSS;
+	countDepthComplexityDSS.DepthEnable = false;
+	countDepthComplexityDSS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	countDepthComplexityDSS.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	countDepthComplexityDSS.StencilEnable = true;
+	countDepthComplexityDSS.StencilReadMask = 0xff;
+	countDepthComplexityDSS.StencilWriteMask = 0xff;
+
+	countDepthComplexityDSS.FrontFace.StencilFailOp = D3D12_STENCIL_OP_INCR;
+	countDepthComplexityDSS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_INCR;
+	countDepthComplexityDSS.FrontFace.StencilPassOp = D3D12_STENCIL_OP_INCR;
+	countDepthComplexityDSS.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+	// 我们不绘制背面多边形，所以这些属性无所谓
+	countDepthComplexityDSS.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	countDepthComplexityDSS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	countDepthComplexityDSS.BackFace.StencilPassOp = D3D12_STENCIL_OP_REPLACE;
+	countDepthComplexityDSS.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC countDepthComplexityPsoDesc = opaquePsoDesc;
+	countDepthComplexityPsoDesc.BlendState = countDepthComplexityBlendState;
+	countDepthComplexityPsoDesc.DepthStencilState = countDepthComplexityDSS;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&countDepthComplexityPsoDesc, IID_PPV_ARGS(&mPSOs["countDepthComplexity"])));
+
+	//
+	// 显示深度复杂度（使用模板缓冲）
+	//
+	D3D12_DEPTH_STENCIL_DESC showDepthComplexityDSS;
+	showDepthComplexityDSS.DepthEnable = false;
+	showDepthComplexityDSS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	showDepthComplexityDSS.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	showDepthComplexityDSS.StencilEnable = true;
+	showDepthComplexityDSS.StencilReadMask = 0xff;
+	showDepthComplexityDSS.StencilWriteMask = 0xff;
+
+	showDepthComplexityDSS.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	showDepthComplexityDSS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	showDepthComplexityDSS.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+	showDepthComplexityDSS.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+
+	// 我们不绘制背面多边形，所以这些属性无所谓
+	showDepthComplexityDSS.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	showDepthComplexityDSS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	showDepthComplexityDSS.BackFace.StencilPassOp = D3D12_STENCIL_OP_REPLACE;
+	showDepthComplexityDSS.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC showDepthComplexityPsoDesc = opaquePsoDesc;
+	showDepthComplexityPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["UIVS"]->GetBufferPointer()),
+		mShaders["UIVS"]->GetBufferSize()
+	};
+	showDepthComplexityPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["UIPS"]->GetBufferPointer()),
+		mShaders["UIPS"]->GetBufferSize()
+	};
+	showDepthComplexityPsoDesc.DepthStencilState = showDepthComplexityDSS;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&showDepthComplexityPsoDesc, IID_PPV_ARGS(&mPSOs["showDepthComplexity"])));
+
+	//
+	// 绘制深度复杂度（使用混合）
+	//
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC showDepthComplexityUseBlendPsoDesc = opaquePsoDesc;
+	showDepthComplexityUseBlendPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["GreyVS"]->GetBufferPointer()),
+		mShaders["GreyVS"]->GetBufferSize()
+	};
+	showDepthComplexityUseBlendPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["GreyPS"]->GetBufferPointer()),
+		mShaders["GreyPS"]->GetBufferSize()
+	};
+
+	D3D12_RENDER_TARGET_BLEND_DESC showDepthComplexityUseBlendBlendDesc;
+	showDepthComplexityUseBlendBlendDesc.BlendEnable = true;
+	showDepthComplexityUseBlendBlendDesc.LogicOpEnable = false;
+	showDepthComplexityUseBlendBlendDesc.SrcBlend = D3D12_BLEND_ONE;
+	showDepthComplexityUseBlendBlendDesc.DestBlend = D3D12_BLEND_ONE;
+	showDepthComplexityUseBlendBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+	showDepthComplexityUseBlendBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+	showDepthComplexityUseBlendBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+	showDepthComplexityUseBlendBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	showDepthComplexityUseBlendBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+	showDepthComplexityUseBlendBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	D3D12_DEPTH_STENCIL_DESC showDepthComplexityUseBlendDSS;
+	showDepthComplexityUseBlendDSS.DepthEnable = false;
+	showDepthComplexityUseBlendDSS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	showDepthComplexityUseBlendDSS.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	showDepthComplexityUseBlendDSS.StencilEnable = false;
+	showDepthComplexityUseBlendDSS.StencilReadMask = 0xff;
+	showDepthComplexityUseBlendDSS.StencilWriteMask = 0xff;
+
+	showDepthComplexityUseBlendDSS.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	showDepthComplexityUseBlendDSS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	showDepthComplexityUseBlendDSS.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+	showDepthComplexityUseBlendDSS.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;
+
+	// 我们不绘制背面多边形，所以这些属性无所谓
+	showDepthComplexityUseBlendDSS.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	showDepthComplexityUseBlendDSS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	showDepthComplexityUseBlendDSS.BackFace.StencilPassOp = D3D12_STENCIL_OP_REPLACE;
+	showDepthComplexityUseBlendDSS.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+	showDepthComplexityUseBlendPsoDesc.BlendState.RenderTarget[0] = showDepthComplexityUseBlendBlendDesc;
+	showDepthComplexityUseBlendPsoDesc.DepthStencilState = showDepthComplexityUseBlendDSS;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&showDepthComplexityUseBlendPsoDesc, IID_PPV_ARGS(&mPSOs["showDepthComplexityUseBlend"])));
 
 	//
 	// 天空球

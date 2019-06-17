@@ -46,10 +46,12 @@ void Instance::UpdateObjectCB()
 	auto &uploadBuffer = mFrameResources[gCurrFrameResourceIndex];
 	if (mNumFramesDirty > 0) {
 		XMMATRIX world = XMLoadFloat4x4(&GetWorld());
-		XMMATRIX texTransform = XMMatrixScaling(mTexTransform.x, mTexTransform.y, mTexTransform.z);
+		XMMATRIX inverseTransposeWorld = MathHelper::InverseTranspose(world);
+		XMMATRIX texTransform = XMLoadFloat4x4(&mTexTransform);
 
 		ObjectConstants objConstants;
 		XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
+		XMStoreFloat4x4(&objConstants.InverseTransposeWorld, XMMatrixTranspose(inverseTransposeWorld));
 		XMStoreFloat4x4(&objConstants.TexTransform, XMMatrixTranspose(texTransform));
 		objConstants.MaterialIndex = mMat->GetIndex();
 

@@ -28,9 +28,10 @@ public:
 	~Material();
 
 	int GetIndex();
+	void Change();
 
 private:
-	void Change();
+	//
 
 public:
 	std::string mName;
@@ -40,7 +41,7 @@ public:
 	XMFLOAT4 mDiffuseAlbedo = { 1.0f, 1.0f, 1.0f, 1.0f };
 	XMFLOAT3 mFresnelR0 = { 0.01f, 0.01f, 0.01f };
 	float mRoughness = .25f;
-	XMFLOAT3 mMatTransform = XMFLOAT3(1.0f, 1.0f, 1.0f);
+	XMFLOAT4X4 mMatTransform = MathHelper::Identity4x4();
 
 private:
 	int mNumFramesDirty = gNumFrameResources; // 指示对象数据发生变化
@@ -55,7 +56,7 @@ public:
 
 	void AddMaterial(const std::string& name, UINT diffuseIndex, UINT normalIndex,
 		const XMFLOAT4& diffuseAlbedo, const XMFLOAT3& fresnelR0, float roughness,
-		const XMFLOAT3& mMatTransform);
+		const XMFLOAT4X4& mMatTransform);
 	void AddMaterial(std::unique_ptr<Material> mat);
 	void DeleteMaterial(std::string name);
 

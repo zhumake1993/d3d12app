@@ -42,7 +42,7 @@ MaterialManager::~MaterialManager()
 
 void MaterialManager::AddMaterial(const std::string& name, UINT diffuseIndex, UINT normalIndex,
 	const XMFLOAT4& diffuseAlbedo, const XMFLOAT3& fresnelR0, float roughness,
-	const XMFLOAT3& matTransform)
+	const XMFLOAT4X4& matTransform)
 {
 	auto mat = std::make_unique<Material>();
 	mat->mName = name;
@@ -86,7 +86,7 @@ void MaterialManager::UpdateMaterialBuffer()
 	for (auto& e : mMaterials) {
 		Material* mat = e.second.get();
 		if (mat->mNumFramesDirty > 0) {
-			XMMATRIX matTransform = XMMatrixScaling(mat->mMatTransform.x, mat->mMatTransform.y, mat->mMatTransform.z);
+			XMMATRIX matTransform = XMLoadFloat4x4(&mat->mMatTransform);
 
 			MaterialData matData;
 			matData.DiffuseAlbedo = mat->mDiffuseAlbedo;
