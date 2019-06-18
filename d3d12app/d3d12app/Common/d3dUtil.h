@@ -58,6 +58,8 @@ public:
 		const D3D_SHADER_MACRO* defines,
 		const std::string& entrypoint,
 		const std::string& target);
+
+	static std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
 };
 
 struct Vertex

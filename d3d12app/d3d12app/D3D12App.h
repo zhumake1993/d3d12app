@@ -10,6 +10,9 @@
 #include "Common/MaterialManager.h"
 #include "Common/MeshManager.h"
 #include "Common/InstanceManager.h"
+#include "Common/BlurFilter.h"
+#include "Common/RenderTarget.h"
+#include "Common/SobelFilter.h"
 
 #include "GameObject/Hill.h"
 #include "GameObject/Wave.h"
@@ -54,8 +57,6 @@ private:
 	void BuildShadersAndInputLayout();
 	void BuildPSOs();
 
-	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
-
 private:
 	std::unique_ptr<TextureManager> mTextureManager;
 	std::unique_ptr<MaterialManager> mMaterialManager;
@@ -67,7 +68,7 @@ private:
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout; // 顶点输入布局
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> mPSOs; // 渲染状态对象
 
-	std::unique_ptr<MainFrameResource> mMainFrameResource; // Main资源
+	std::unique_ptr<MainFrameResource> mMainFrameResource; // Main帧资源
 	std::unique_ptr<FrameResource<PassConstants>> mPassCB; // passCB帧资源
 
 	Camera mCamera;
@@ -77,5 +78,13 @@ private:
 	bool mIsWireframe = false;
 	bool mIsDepthComplexity = false;
 	bool mIsDepthComplexityBlend = false;
+
+	std::unique_ptr<RenderTarget> mOffscreenRT = nullptr;
+
+	std::unique_ptr<BlurFilter> mBlurFilter;
+	bool mIsBlur = false;
+
+	std::unique_ptr<SobelFilter> mSobelFilter;
+	bool mIsSobel = true;
 };
 

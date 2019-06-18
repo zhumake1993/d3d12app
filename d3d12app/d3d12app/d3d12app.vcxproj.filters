@@ -36,6 +36,15 @@
     <FxCompile Include="Shaders\Grey.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
+    <FxCompile Include="Shaders\Blur.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\FullScreenQuad.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Sobel.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D3D12App.cpp">
@@ -82,6 +91,15 @@
     </ClCompile>
     <ClCompile Include="GameObject\Wave.cpp">
       <Filter>GameObject</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\BlurFilter.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\RenderTarget.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Common\SobelFilter.cpp">
+      <Filter>Common</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -135,6 +153,15 @@
     </ClInclude>
     <ClInclude Include="GameObject\Wave.h">
       <Filter>GameObject</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\BlurFilter.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\RenderTarget.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\SobelFilter.h">
+      <Filter>Common</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

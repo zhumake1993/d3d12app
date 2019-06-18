@@ -24,6 +24,17 @@ bool D3D12App::Initialize()
 	mMeshManager = std::make_unique<MeshManager>(md3dDevice.Get(), mCommandList.Get());
 	mInstanceManager = std::make_unique<InstanceManager>(md3dDevice.Get());
 
+	mBlurFilter = std::make_unique<BlurFilter>(md3dDevice.Get(), mCommandList.Get(), 
+		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
+
+	mSobelFilter = std::make_unique<SobelFilter>(md3dDevice.Get(), mCommandList.Get(),
+		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
+
+	mOffscreenRT = std::make_unique<RenderTarget>(
+		md3dDevice.Get(), mCommandList.Get(),
+		mClientWidth, mClientHeight,
+		mBackBufferFormat);
+
 	BuildTextures();
 	BuildMaterials();
 	BuildMeshes();
@@ -52,6 +63,18 @@ void D3D12App::OnResize()
 	D3DApp::OnResize();
 
 	mCamera.SetLens(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+
+	if (mBlurFilter != nullptr) {
+		mBlurFilter->OnResize(mClientWidth, mClientHeight);
+	}
+
+	if (mSobelFilter != nullptr) {
+		mSobelFilter->OnResize(mClientWidth, mClientHeight);
+	}
+
+	if (mOffscreenRT != nullptr) {
+		mOffscreenRT->OnResize(mClientWidth, mClientHeight);
+	}
 }
 
 void D3D12App::Update(const GameTimer& gt)
@@ -91,22 +114,26 @@ void D3D12App::Draw(const GameTimer& gt)
 	ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque"].Get()));
 
 	//改变资源的状态
-	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
-		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mOffscreenRT->Resource(),
+		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	//设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
 	mCommandList->RSSetViewports(1, &mScreenViewport);
 	mCommandList->RSSetScissorRects(1, &mScissorRect);
 
 	//清空后背缓冲和深度模板缓冲
-	mCommandList->ClearRenderTargetView(CurrentBackBufferView(), DirectX::Colors::LightSteelBlue, 0, nullptr);
+	mCommandList->ClearRenderTargetView(mOffscreenRT->Rtv(), DirectX::Colors::LightSteelBlue, 0, nullptr);
 	mCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 	//设置渲染目标
-	mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
+	mCommandList->OMSetRenderTargets(1, &mOffscreenRT->Rtv(), true, &DepthStencilView());
 
 
 
+
+	//
+	// 主绘制
+	//
 
 	ID3D12DescriptorHeap* descriptorHeaps[] = { mTextureManager->mSrvDescriptorHeap.Get() };
 	mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
@@ -131,7 +158,6 @@ void D3D12App::Draw(const GameTimer& gt)
 		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Opaque);
 		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::AlphaTested);
 		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Transparent);
-
 	} 
 	else if (mIsDepthComplexity) {
 		mCommandList->SetPipelineState(mPSOs["countDepthComplexity"].Get());
@@ -176,12 +202,42 @@ void D3D12App::Draw(const GameTimer& gt)
 		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Sky);
 	}
 
+	//
+	// 后处理
+	//
+
+	if (mIsBlur) {
+		mBlurFilter->Execute(mPSOs["horzBlur"].Get(), mPSOs["vertBlur"].Get(), mOffscreenRT->Resource(), 4);
+	}
+
+	if (mIsSobel) {
+		mSobelFilter->Execute(mPSOs["sobel"].Get(), mOffscreenRT->Resource());
+	}
 
 
+	//
+	// 转换回后缓冲渲染
+	//
 
-	//改变资源的状态
+	// 改变资源状态
+	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+	// 设置渲染目标
+	mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
+
+	mOffscreenRT->TestCopy(mSobelFilter->OutputResource());
+	mOffscreenRT->DrawToBackBuffer(mPSOs["fullScreenQuad"].Get());
+
+	// 改变资源状态
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+
+
+
+
+
 
 	//关闭指令列表
 	ThrowIfFailed(mCommandList->Close());
@@ -231,17 +287,26 @@ void D3D12App::OnMouseMove(WPARAM btnState, int x, int y)
 
 void D3D12App::OnKeyDown(WPARAM vkCode)
 {
-	if (vkCode == '1')
+	if (vkCode == '1') {
 		mIsWireframe = !mIsWireframe;
+		mIsDepthComplexity = false;
+		mIsDepthComplexityBlend = false;
+	}
 
 	if (vkCode == '2') {
 		mIsDepthComplexity = !mIsDepthComplexity;
+		mIsWireframe = false;
 		mIsDepthComplexityBlend = false;
 	}
 
 	if (vkCode == '3') {
-		mIsDepthComplexity = false;
 		mIsDepthComplexityBlend = !mIsDepthComplexityBlend;
+		mIsWireframe = false;
+		mIsDepthComplexity = false;
+	}
+
+	if (vkCode == '4') {
+		mIsBlur = !mIsBlur;
 	}
 }
 
@@ -658,7 +723,7 @@ void D3D12App::BuildRootSignature()
 	slotRootParameter[3].InitAsDescriptorTable(1, &texCubeMap, D3D12_SHADER_VISIBILITY_PIXEL); // 天空球
 	slotRootParameter[4].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL); // 纹理
 
-	auto staticSamplers = GetStaticSamplers();
+	auto staticSamplers = d3dUtil::GetStaticSamplers();
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(_countof(slotRootParameter), slotRootParameter,
 		(UINT)staticSamplers.size(), staticSamplers.data(),
@@ -708,6 +773,14 @@ void D3D12App::BuildShadersAndInputLayout()
 
 	mShaders["skyVS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["skyPS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "PS", "ps_5_1");
+
+	mShaders["horzBlurCS"] = d3dUtil::CompileShader(L"Shaders\\Blur.hlsl", nullptr, "HorzBlurCS", "cs_5_1");
+	mShaders["vertBlurCS"] = d3dUtil::CompileShader(L"Shaders\\Blur.hlsl", nullptr, "VertBlurCS", "cs_5_1");
+
+	mShaders["fullScreenQuadVS"] = d3dUtil::CompileShader(L"Shaders\\FullScreenQuad.hlsl", nullptr, "VS", "vs_5_1");
+	mShaders["fullScreenQuadPS"] = d3dUtil::CompileShader(L"Shaders\\FullScreenQuad.hlsl", nullptr, "PS", "ps_5_1");
+
+	mShaders["sobelCS"] = d3dUtil::CompileShader(L"Shaders\\Sobel.hlsl", nullptr, "SobelCS", "cs_5_1");
 
 	mInputLayout =
 	{
@@ -927,58 +1000,66 @@ void D3D12App::BuildPSOs()
 		mShaders["skyPS"]->GetBufferSize()
 	};
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&skyPsoDesc, IID_PPV_ARGS(&mPSOs["sky"])));
-}
 
-std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> D3D12App::GetStaticSamplers()
-{
-	const CD3DX12_STATIC_SAMPLER_DESC pointWrap(
-		0, // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_POINT, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
+	//
+	// 水平模糊
+	//
+	D3D12_COMPUTE_PIPELINE_STATE_DESC horzBlurPSO = {};
+	horzBlurPSO.pRootSignature = mBlurFilter->GetRootSignature();
+	horzBlurPSO.CS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["horzBlurCS"]->GetBufferPointer()),
+		mShaders["horzBlurCS"]->GetBufferSize()
+	};
+	horzBlurPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&horzBlurPSO, IID_PPV_ARGS(&mPSOs["horzBlur"])));
 
-	const CD3DX12_STATIC_SAMPLER_DESC pointClamp(
-		1, // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_POINT, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+	//
+	// 垂直模糊
+	//
+	D3D12_COMPUTE_PIPELINE_STATE_DESC vertBlurPSO = {};
+	vertBlurPSO.pRootSignature = mBlurFilter->GetRootSignature();
+	vertBlurPSO.CS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["vertBlurCS"]->GetBufferPointer()),
+		mShaders["vertBlurCS"]->GetBufferSize()
+	};
+	vertBlurPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&vertBlurPSO, IID_PPV_ARGS(&mPSOs["vertBlur"])));
 
-	const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
-		2, // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
+	//
+	// 绘制全屏quad
+	//
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC fullScreenQuadPSO = opaquePsoDesc;
+	fullScreenQuadPSO.pRootSignature = mOffscreenRT->GetRootSignature();
 
-	const CD3DX12_STATIC_SAMPLER_DESC linearClamp(
-		3, // shaderRegister
-		D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+	// 关闭深度测试
+	fullScreenQuadPSO.DepthStencilState.DepthEnable = false;
+	fullScreenQuadPSO.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+	fullScreenQuadPSO.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
 
-	const CD3DX12_STATIC_SAMPLER_DESC anisotropicWrap(
-		4, // shaderRegister
-		D3D12_FILTER_ANISOTROPIC, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressW
-		0.0f,                             // mipLODBias
-		8);                               // maxAnisotropy
+	fullScreenQuadPSO.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["fullScreenQuadVS"]->GetBufferPointer()),
+		mShaders["fullScreenQuadVS"]->GetBufferSize()
+	};
+	fullScreenQuadPSO.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["fullScreenQuadPS"]->GetBufferPointer()),
+		mShaders["fullScreenQuadPS"]->GetBufferSize()
+	};
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&fullScreenQuadPSO, IID_PPV_ARGS(&mPSOs["fullScreenQuad"])));
 
-	const CD3DX12_STATIC_SAMPLER_DESC anisotropicClamp(
-		5, // shaderRegister
-		D3D12_FILTER_ANISOTROPIC, // filter
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressW
-		0.0f,                              // mipLODBias
-		8);                                // maxAnisotropy
-
-	return {
-		pointWrap, pointClamp,
-		linearWrap, linearClamp,
-		anisotropicWrap, anisotropicClamp };
+	//
+	// sobel
+	//
+	D3D12_COMPUTE_PIPELINE_STATE_DESC sobelPSO = {};
+	sobelPSO.pRootSignature = mSobelFilter->GetRootSignature();
+	sobelPSO.CS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["sobelCS"]->GetBufferPointer()),
+		mShaders["sobelCS"]->GetBufferSize()
+	};
+	sobelPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&sobelPSO, IID_PPV_ARGS(&mPSOs["sobel"])));
 }

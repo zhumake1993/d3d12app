@@ -127,6 +127,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <FxCompile Include="Shaders\Blur.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="Shaders\Common.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
@@ -139,6 +145,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="Shaders\FullScreenQuad.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="Shaders\Grey.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
@@ -146,6 +158,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="Shaders\LightingUtil.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Shaders\Sobel.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -165,6 +183,7 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Common\BlurFilter.cpp" />
     <ClCompile Include="Common\Camera.cpp" />
     <ClCompile Include="Common\D3DApp.cpp" />
     <ClCompile Include="Common\d3dUtil.cpp" />
@@ -175,6 +194,8 @@
     <ClCompile Include="Common\MaterialManager.cpp" />
     <ClCompile Include="Common\MathHelper.cpp" />
     <ClCompile Include="Common\MeshManager.cpp" />
+    <ClCompile Include="Common\RenderTarget.cpp" />
+    <ClCompile Include="Common\SobelFilter.cpp" />
     <ClCompile Include="Common\TextureManager.cpp" />
     <ClCompile Include="D3D12App.cpp" />
     <ClCompile Include="GameObject\Hill.cpp" />
@@ -182,6 +203,7 @@
     <ClCompile Include="TheMain.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Common\BlurFilter.h" />
     <ClInclude Include="Common\Camera.h" />
     <ClInclude Include="Common\D3DApp.h" />
     <ClInclude Include="Common\d3dUtil.h" />
@@ -194,6 +216,8 @@
     <ClInclude Include="Common\MaterialManager.h" />
     <ClInclude Include="Common\MathHelper.h" />
     <ClInclude Include="Common\MeshManager.h" />
+    <ClInclude Include="Common\RenderTarget.h" />
+    <ClInclude Include="Common\SobelFilter.h" />
     <ClInclude Include="Common\TextureManager.h" />
     <ClInclude Include="Common\UploadBuffer.h" />
     <ClInclude Include="D3D12App.h" />
