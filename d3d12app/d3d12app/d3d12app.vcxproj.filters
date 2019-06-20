@@ -16,6 +16,9 @@
     <Filter Include="GameObject">
       <UniqueIdentifier>{c5f86b52-bd17-4b17-8bd3-8f15e358b539}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Effect">
+      <UniqueIdentifier>{f29bb2c2-7b31-43bf-ac0e-c23ece82332c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\Common.hlsl">
@@ -39,10 +42,10 @@
     <FxCompile Include="Shaders\Blur.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
-    <FxCompile Include="Shaders\FullScreenQuad.hlsl">
+    <FxCompile Include="Shaders\Sobel.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
-    <FxCompile Include="Shaders\Sobel.hlsl">
+    <FxCompile Include="Shaders\Inverse.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
   </ItemGroup>
@@ -92,14 +95,29 @@
     <ClCompile Include="GameObject\Wave.cpp">
       <Filter>GameObject</Filter>
     </ClCompile>
-    <ClCompile Include="Common\BlurFilter.cpp">
-      <Filter>Common</Filter>
+    <ClCompile Include="Effect\Wireframe.cpp">
+      <Filter>Effect</Filter>
     </ClCompile>
-    <ClCompile Include="Common\RenderTarget.cpp">
-      <Filter>Common</Filter>
+    <ClCompile Include="Effect\BlurFilter.cpp">
+      <Filter>Effect</Filter>
     </ClCompile>
-    <ClCompile Include="Common\SobelFilter.cpp">
-      <Filter>Common</Filter>
+    <ClCompile Include="Effect\DrawQuad.cpp">
+      <Filter>Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="Effect\RenderTarget.cpp">
+      <Filter>Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="Effect\DepthComplexityUseStencil.cpp">
+      <Filter>Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="Effect\DepthComplexityUseBlend.cpp">
+      <Filter>Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="Effect\InverseFilter.cpp">
+      <Filter>Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="Effect\SobelFilter.cpp">
+      <Filter>Effect</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -154,14 +172,29 @@
     <ClInclude Include="GameObject\Wave.h">
       <Filter>GameObject</Filter>
     </ClInclude>
-    <ClInclude Include="Common\BlurFilter.h">
-      <Filter>Common</Filter>
+    <ClInclude Include="Effect\Wireframe.h">
+      <Filter>Effect</Filter>
     </ClInclude>
-    <ClInclude Include="Common\RenderTarget.h">
-      <Filter>Common</Filter>
+    <ClInclude Include="Effect\BlurFilter.h">
+      <Filter>Effect</Filter>
     </ClInclude>
-    <ClInclude Include="Common\SobelFilter.h">
-      <Filter>Common</Filter>
+    <ClInclude Include="Effect\DrawQuad.h">
+      <Filter>Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="Effect\RenderTarget.h">
+      <Filter>Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="Effect\DepthComplexityUseStencil.h">
+      <Filter>Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="Effect\DepthComplexityUseBlend.h">
+      <Filter>Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="Effect\InverseFilter.h">
+      <Filter>Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="Effect\SobelFilter.h">
+      <Filter>Effect</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

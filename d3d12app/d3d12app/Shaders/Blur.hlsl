@@ -1,7 +1,6 @@
 cbuffer cbSettings : register(b0)
 {
 	// 常量缓冲中不能有数组项，因此需要列出每个元素
-	
 	int gBlurRadius;
 
 	// 11个模糊权重

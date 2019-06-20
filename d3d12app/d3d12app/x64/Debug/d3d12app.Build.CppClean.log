@@ -15,6 +15,11 @@ f:\d3d12app\d3d12app\d3d12app\x64\debug\ddstextureloader.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\d3dutil.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\d3dapp.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\camera.obj
+f:\d3d12app\d3d12app\d3d12app\x64\debug\rendertarget.obj
+f:\d3d12app\d3d12app\d3d12app\x64\debug\blurfilter.obj
+f:\d3d12app\d3d12app\d3d12app\x64\debug\sobelfilter.obj
+f:\d3d12app\d3d12app\d3d12app\x64\debug\wireframe.obj
+f:\d3d12app\d3d12app\d3d12app\x64\debug\drawquad.obj
 f:\d3d12app\d3d12app\x64\debug\d3d12app.exe
 f:\d3d12app\d3d12app\x64\debug\d3d12app.ilk
 f:\d3d12app\d3d12app\x64\debug\d3d12app.pdb

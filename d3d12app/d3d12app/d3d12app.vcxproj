@@ -145,13 +145,13 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Shaders\FullScreenQuad.hlsl">
+    <FxCompile Include="Shaders\Grey.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Shaders\Grey.hlsl">
+    <FxCompile Include="Shaders\Inverse.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -183,7 +183,6 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Common\BlurFilter.cpp" />
     <ClCompile Include="Common\Camera.cpp" />
     <ClCompile Include="Common\D3DApp.cpp" />
     <ClCompile Include="Common\d3dUtil.cpp" />
@@ -194,16 +193,21 @@
     <ClCompile Include="Common\MaterialManager.cpp" />
     <ClCompile Include="Common\MathHelper.cpp" />
     <ClCompile Include="Common\MeshManager.cpp" />
-    <ClCompile Include="Common\RenderTarget.cpp" />
-    <ClCompile Include="Common\SobelFilter.cpp" />
     <ClCompile Include="Common\TextureManager.cpp" />
     <ClCompile Include="D3D12App.cpp" />
+    <ClCompile Include="Effect\BlurFilter.cpp" />
+    <ClCompile Include="Effect\DepthComplexityUseBlend.cpp" />
+    <ClCompile Include="Effect\DepthComplexityUseStencil.cpp" />
+    <ClCompile Include="Effect\DrawQuad.cpp" />
+    <ClCompile Include="Effect\InverseFilter.cpp" />
+    <ClCompile Include="Effect\RenderTarget.cpp" />
+    <ClCompile Include="Effect\SobelFilter.cpp" />
+    <ClCompile Include="Effect\Wireframe.cpp" />
     <ClCompile Include="GameObject\Hill.cpp" />
     <ClCompile Include="GameObject\Wave.cpp" />
     <ClCompile Include="TheMain.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Common\BlurFilter.h" />
     <ClInclude Include="Common\Camera.h" />
     <ClInclude Include="Common\D3DApp.h" />
     <ClInclude Include="Common\d3dUtil.h" />
@@ -216,11 +220,17 @@
     <ClInclude Include="Common\MaterialManager.h" />
     <ClInclude Include="Common\MathHelper.h" />
     <ClInclude Include="Common\MeshManager.h" />
-    <ClInclude Include="Common\RenderTarget.h" />
-    <ClInclude Include="Common\SobelFilter.h" />
     <ClInclude Include="Common\TextureManager.h" />
     <ClInclude Include="Common\UploadBuffer.h" />
     <ClInclude Include="D3D12App.h" />
+    <ClInclude Include="Effect\BlurFilter.h" />
+    <ClInclude Include="Effect\DepthComplexityUseBlend.h" />
+    <ClInclude Include="Effect\DepthComplexityUseStencil.h" />
+    <ClInclude Include="Effect\DrawQuad.h" />
+    <ClInclude Include="Effect\InverseFilter.h" />
+    <ClInclude Include="Effect\RenderTarget.h" />
+    <ClInclude Include="Effect\SobelFilter.h" />
+    <ClInclude Include="Effect\Wireframe.h" />
     <ClInclude Include="GameObject\Hill.h" />
     <ClInclude Include="GameObject\Wave.h" />
   </ItemGroup>

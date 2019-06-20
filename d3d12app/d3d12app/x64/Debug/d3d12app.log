@@ -1,5 +1,2 @@
-﻿  RenderTarget.cpp
-  D3D12App.cpp
-  TheMain.cpp
-  正在生成代码...
+﻿  D3D12App.cpp
   d3d12app.vcxproj -> F:\d3d12app\d3d12app\x64\Debug\d3d12app.exe

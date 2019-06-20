@@ -10,9 +10,15 @@
 #include "Common/MaterialManager.h"
 #include "Common/MeshManager.h"
 #include "Common/InstanceManager.h"
-#include "Common/BlurFilter.h"
-#include "Common/RenderTarget.h"
-#include "Common/SobelFilter.h"
+
+#include "Effect/RenderTarget.h"
+#include "Effect/DrawQuad.h"
+#include "Effect/Wireframe.h"
+#include "Effect/DepthComplexityUseStencil.h"
+#include "Effect/DepthComplexityUseBlend.h"
+#include "Effect/BlurFilter.h"
+#include "Effect/SobelFilter.h"
+#include "Effect/InverseFilter.h"
 
 #include "GameObject/Hill.h"
 #include "GameObject/Wave.h"
@@ -75,16 +81,25 @@ private:
 
 	POINT mLastMousePos;
 
-	bool mIsWireframe = false;
-	bool mIsDepthComplexity = false;
-	bool mIsDepthComplexityBlend = false;
+	std::unique_ptr<RenderTarget> mRenderTarget = nullptr;
 
-	std::unique_ptr<RenderTarget> mOffscreenRT = nullptr;
+	std::unique_ptr<DrawQuad> mDrawQuad = nullptr;
+
+	std::unique_ptr<Wireframe> mWireframe = nullptr;
+	bool mIsWireframe = false;
+
+	std::unique_ptr<DepthComplexityUseStencil> mDepthComplexityUseStencil = nullptr;
+	bool mIsDepthComplexityUseStencil = false;
+
+	std::unique_ptr<DepthComplexityUseBlend> mDepthComplexityUseBlend = nullptr;
+	bool mIsDepthComplexityUseBlend = false;
 
 	std::unique_ptr<BlurFilter> mBlurFilter;
 	bool mIsBlur = false;
 
 	std::unique_ptr<SobelFilter> mSobelFilter;
-	bool mIsSobel = true;
+	bool mIsSobel = false;
+
+	std::unique_ptr<InverseFilter> mInverseFilter;
 };
 

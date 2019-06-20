@@ -35,8 +35,8 @@ void SobelCS(int3 dispatchThreadID : SV_DispatchThreadID)
 	// 梯度是(Gx, Gy)，对于每个颜色通道，计算magnitude来得到最大变化率
 	float4 mag = sqrt(Gx*Gx + Gy*Gy);
 
-	// 边缘黑色，非边缘白色
-	mag = 1.0f - saturate(CalcLuminance(mag.rgb));
+	// 边缘白色，非边缘黑色
+	mag = saturate(CalcLuminance(mag.rgb));
 
 	gOutput[dispatchThreadID.xy] = mag;
 }

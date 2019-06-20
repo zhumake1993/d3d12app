@@ -24,16 +24,26 @@ bool D3D12App::Initialize()
 	mMeshManager = std::make_unique<MeshManager>(md3dDevice.Get(), mCommandList.Get());
 	mInstanceManager = std::make_unique<InstanceManager>(md3dDevice.Get());
 
-	mBlurFilter = std::make_unique<BlurFilter>(md3dDevice.Get(), mCommandList.Get(), 
+	mRenderTarget = std::make_unique<RenderTarget>(md3dDevice.Get(),
+		mClientWidth, mClientHeight, mBackBufferFormat);
+
+	mDrawQuad = std::make_unique<DrawQuad>(md3dDevice.Get(), mCommandList.Get(),
+		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
+
+	mWireframe = std::make_unique<Wireframe>(md3dDevice.Get(), mCommandList.Get());
+
+	mDepthComplexityUseStencil = std::make_unique<DepthComplexityUseStencil>(md3dDevice.Get(), mCommandList.Get());
+
+	mDepthComplexityUseBlend = std::make_unique<DepthComplexityUseBlend>(md3dDevice.Get(), mCommandList.Get());
+
+	mBlurFilter = std::make_unique<BlurFilter>(md3dDevice.Get(), mCommandList.Get(),
 		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
 
 	mSobelFilter = std::make_unique<SobelFilter>(md3dDevice.Get(), mCommandList.Get(),
 		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
 
-	mOffscreenRT = std::make_unique<RenderTarget>(
-		md3dDevice.Get(), mCommandList.Get(),
-		mClientWidth, mClientHeight,
-		mBackBufferFormat);
+	mInverseFilter = std::make_unique<InverseFilter>(md3dDevice.Get(), mCommandList.Get(),
+		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
 
 	BuildTextures();
 	BuildMaterials();
@@ -64,6 +74,14 @@ void D3D12App::OnResize()
 
 	mCamera.SetLens(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 
+	if (mRenderTarget != nullptr) {
+		mRenderTarget->OnResize(mClientWidth, mClientHeight);
+	}
+
+	if (mDrawQuad != nullptr) {
+		mDrawQuad->OnResize(mClientWidth, mClientHeight);
+	}
+
 	if (mBlurFilter != nullptr) {
 		mBlurFilter->OnResize(mClientWidth, mClientHeight);
 	}
@@ -72,8 +90,8 @@ void D3D12App::OnResize()
 		mSobelFilter->OnResize(mClientWidth, mClientHeight);
 	}
 
-	if (mOffscreenRT != nullptr) {
-		mOffscreenRT->OnResize(mClientWidth, mClientHeight);
+	if (mInverseFilter != nullptr) {
+		mInverseFilter->OnResize(mClientWidth, mClientHeight);
 	}
 }
 
@@ -113,20 +131,16 @@ void D3D12App::Draw(const GameTimer& gt)
 	//ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque"].Get()));
 	ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque"].Get()));
 
-	//改变资源的状态
-	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mOffscreenRT->Resource(),
-		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
 	//设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
 	mCommandList->RSSetViewports(1, &mScreenViewport);
 	mCommandList->RSSetScissorRects(1, &mScissorRect);
 
 	//清空后背缓冲和深度模板缓冲
-	mCommandList->ClearRenderTargetView(mOffscreenRT->Rtv(), DirectX::Colors::LightSteelBlue, 0, nullptr);
+	mCommandList->ClearRenderTargetView(mRenderTarget->Rtv(), DirectX::Colors::LightSteelBlue, 0, nullptr);
 	mCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 	//设置渲染目标
-	mCommandList->OMSetRenderTargets(1, &mOffscreenRT->Rtv(), true, &DepthStencilView());
+	mCommandList->OMSetRenderTargets(1, &mRenderTarget->Rtv(), true, &DepthStencilView());
 
 
 
@@ -154,39 +168,13 @@ void D3D12App::Draw(const GameTimer& gt)
 	mCommandList->SetGraphicsRootDescriptorTable(3, mTextureManager->GetGpuSrvCube());
 
 	if (mIsWireframe) {
-		mCommandList->SetPipelineState(mPSOs["opaque_wireframe"].Get());
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Opaque);
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::AlphaTested);
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Transparent);
+		mWireframe->Draw(mInstanceManager);
 	} 
-	else if (mIsDepthComplexity) {
-		mCommandList->SetPipelineState(mPSOs["countDepthComplexity"].Get());
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Opaque);
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::AlphaTested);
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Transparent);
-
-		mCommandList->SetPipelineState(mPSOs["showDepthComplexity"].Get());
-
-		mCommandList->OMSetStencilRef(1);
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::DepthComplexity1);
-
-		mCommandList->OMSetStencilRef(2);
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::DepthComplexity2);
-
-		mCommandList->OMSetStencilRef(3);
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::DepthComplexity3);
-
-		mCommandList->OMSetStencilRef(4);
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::DepthComplexity4);
-
-		mCommandList->OMSetStencilRef(5);
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::DepthComplexity5);
+	else if (mIsDepthComplexityUseStencil) {
+		mDepthComplexityUseStencil->Draw(mInstanceManager);
 	}
-	else if (mIsDepthComplexityBlend) {
-		mCommandList->SetPipelineState(mPSOs["showDepthComplexityUseBlend"].Get());
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Opaque);
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::AlphaTested);
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Transparent);
+	else if (mIsDepthComplexityUseBlend) {
+		mDepthComplexityUseBlend->Draw(mInstanceManager);
 	}
 	else {
 		mCommandList->SetPipelineState(mPSOs["opaque"].Get());
@@ -207,11 +195,19 @@ void D3D12App::Draw(const GameTimer& gt)
 	//
 
 	if (mIsBlur) {
-		mBlurFilter->Execute(mPSOs["horzBlur"].Get(), mPSOs["vertBlur"].Get(), mOffscreenRT->Resource(), 4);
+		mBlurFilter->CopyIn(mRenderTarget->Resource());
+		mBlurFilter->Execute(4);
+		mBlurFilter->CopyOut(mRenderTarget->Resource());
 	}
 
 	if (mIsSobel) {
-		mSobelFilter->Execute(mPSOs["sobel"].Get(), mOffscreenRT->Resource());
+		mSobelFilter->CopyIn(mRenderTarget->Resource());
+		mSobelFilter->Execute();
+		mSobelFilter->CopyOut(mRenderTarget->Resource());
+
+		mInverseFilter->CopyIn(mRenderTarget->Resource());
+		mInverseFilter->Execute();
+		mInverseFilter->CopyOut(mRenderTarget->Resource());
 	}
 
 
@@ -226,18 +222,12 @@ void D3D12App::Draw(const GameTimer& gt)
 	// 设置渲染目标
 	mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
 
-	mOffscreenRT->TestCopy(mSobelFilter->OutputResource());
-	mOffscreenRT->DrawToBackBuffer(mPSOs["fullScreenQuad"].Get());
+	mDrawQuad->CopyIn(mRenderTarget->Resource());
+	mDrawQuad->Draw();
 
 	// 改变资源状态
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-
-
-
-
-
-
 
 	//关闭指令列表
 	ThrowIfFailed(mCommandList->Close());
@@ -289,24 +279,28 @@ void D3D12App::OnKeyDown(WPARAM vkCode)
 {
 	if (vkCode == '1') {
 		mIsWireframe = !mIsWireframe;
-		mIsDepthComplexity = false;
-		mIsDepthComplexityBlend = false;
+		mIsDepthComplexityUseStencil = false;
+		mIsDepthComplexityUseBlend = false;
 	}
 
 	if (vkCode == '2') {
-		mIsDepthComplexity = !mIsDepthComplexity;
+		mIsDepthComplexityUseStencil = !mIsDepthComplexityUseStencil;
 		mIsWireframe = false;
-		mIsDepthComplexityBlend = false;
+		mIsDepthComplexityUseBlend = false;
 	}
 
 	if (vkCode == '3') {
-		mIsDepthComplexityBlend = !mIsDepthComplexityBlend;
+		mIsDepthComplexityUseBlend = !mIsDepthComplexityUseBlend;
 		mIsWireframe = false;
-		mIsDepthComplexity = false;
+		mIsDepthComplexityUseStencil = false;
 	}
 
 	if (vkCode == '4') {
 		mIsBlur = !mIsBlur;
+	}
+
+	if (vkCode == '5') {
+		mIsSobel = !mIsSobel;
 	}
 }
 
@@ -483,51 +477,6 @@ void D3D12App::BuildMaterials()
 	wirefence->mFresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	wirefence->mRoughness = 0.25f;
 	mMaterialManager->AddMaterial(std::move(wirefence));
-
-	auto DepthComplexityColor1 = std::make_unique<Material>();
-	DepthComplexityColor1->mName = "DepthComplexityColor1";
-	DepthComplexityColor1->mDiffuseIndex = -1;
-	DepthComplexityColor1->mNormalIndex = -1;
-	DepthComplexityColor1->mDiffuseAlbedo = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-	DepthComplexityColor1->mFresnelR0 = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	DepthComplexityColor1->mRoughness = -1;
-	mMaterialManager->AddMaterial(std::move(DepthComplexityColor1));
-
-	auto DepthComplexityColor2 = std::make_unique<Material>();
-	DepthComplexityColor2->mName = "DepthComplexityColor2";
-	DepthComplexityColor2->mDiffuseIndex = -1;
-	DepthComplexityColor2->mNormalIndex = -1;
-	DepthComplexityColor2->mDiffuseAlbedo = XMFLOAT4(0.4f, 0.4f, 0.4f, 1.0f);
-	DepthComplexityColor2->mFresnelR0 = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	DepthComplexityColor2->mRoughness = -1;
-	mMaterialManager->AddMaterial(std::move(DepthComplexityColor2));
-
-	auto DepthComplexityColor3 = std::make_unique<Material>();
-	DepthComplexityColor3->mName = "DepthComplexityColor3";
-	DepthComplexityColor3->mDiffuseIndex = -1;
-	DepthComplexityColor3->mNormalIndex = -1;
-	DepthComplexityColor3->mDiffuseAlbedo = XMFLOAT4(0.6f, 0.6f, 0.6f, 1.0f);
-	DepthComplexityColor3->mFresnelR0 = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	DepthComplexityColor3->mRoughness = -1;
-	mMaterialManager->AddMaterial(std::move(DepthComplexityColor3));
-
-	auto DepthComplexityColor4 = std::make_unique<Material>();
-	DepthComplexityColor4->mName = "DepthComplexityColor4";
-	DepthComplexityColor4->mDiffuseIndex = -1;
-	DepthComplexityColor4->mNormalIndex = -1;
-	DepthComplexityColor4->mDiffuseAlbedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
-	DepthComplexityColor4->mFresnelR0 = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	DepthComplexityColor4->mRoughness = -1;
-	mMaterialManager->AddMaterial(std::move(DepthComplexityColor4));
-
-	auto DepthComplexityColor5 = std::make_unique<Material>();
-	DepthComplexityColor5->mName = "DepthComplexityColor5";
-	DepthComplexityColor5->mDiffuseIndex = -1;
-	DepthComplexityColor5->mNormalIndex = -1;
-	DepthComplexityColor5->mDiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	DepthComplexityColor5->mFresnelR0 = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	DepthComplexityColor5->mRoughness = -1;
-	mMaterialManager->AddMaterial(std::move(DepthComplexityColor5));
 }
 
 void D3D12App::BuildMeshes()
@@ -537,7 +486,6 @@ void D3D12App::BuildMeshes()
 	mMeshManager->AddGeometry("grid", geoGen.CreateGrid(20.0f, 30.0f, 60, 40));
 	mMeshManager->AddGeometry("sphere", geoGen.CreateSphere(0.5f, 20, 20));
 	mMeshManager->AddGeometry("cylinder", geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20));
-	mMeshManager->AddGeometry("quad", geoGen.CreateQuad(-1.0f, 1.0f, 2.0f, 2.0, 0.0));
 
 	auto hill = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
 	for (auto& v : hill.Vertices) {
@@ -675,36 +623,6 @@ void D3D12App::BuildInstances()
 	box2->mMat = mMaterialManager->mMaterials["wirefence"].get();
 	box2->mGeo = mMeshManager->mGeometries["box2"].get();
 	mInstanceManager->AddInstance(std::move(box2), (int)RenderLayer::AlphaTested);
-
-	auto DepthComplexityQuad1 = std::make_unique<Instance>();
-	DepthComplexityQuad1->mName = "DepthComplexityQuad1";
-	DepthComplexityQuad1->mMat = mMaterialManager->mMaterials["DepthComplexityColor1"].get();
-	DepthComplexityQuad1->mGeo = mMeshManager->mGeometries["quad"].get();
-	mInstanceManager->AddInstance(std::move(DepthComplexityQuad1), (int)RenderLayer::DepthComplexity1);
-
-	auto DepthComplexityQuad2 = std::make_unique<Instance>();
-	DepthComplexityQuad2->mName = "DepthComplexityQuad2";
-	DepthComplexityQuad2->mMat = mMaterialManager->mMaterials["DepthComplexityColor2"].get();
-	DepthComplexityQuad2->mGeo = mMeshManager->mGeometries["quad"].get();
-	mInstanceManager->AddInstance(std::move(DepthComplexityQuad2), (int)RenderLayer::DepthComplexity2);
-
-	auto DepthComplexityQuad3 = std::make_unique<Instance>();
-	DepthComplexityQuad3->mName = "DepthComplexityQuad3";
-	DepthComplexityQuad3->mMat = mMaterialManager->mMaterials["DepthComplexityColor3"].get();
-	DepthComplexityQuad3->mGeo = mMeshManager->mGeometries["quad"].get();
-	mInstanceManager->AddInstance(std::move(DepthComplexityQuad3), (int)RenderLayer::DepthComplexity3);
-
-	auto DepthComplexityQuad4 = std::make_unique<Instance>();
-	DepthComplexityQuad4->mName = "DepthComplexityQuad4";
-	DepthComplexityQuad4->mMat = mMaterialManager->mMaterials["DepthComplexityColor4"].get();
-	DepthComplexityQuad4->mGeo = mMeshManager->mGeometries["quad"].get();
-	mInstanceManager->AddInstance(std::move(DepthComplexityQuad4), (int)RenderLayer::DepthComplexity4);
-
-	auto DepthComplexityQuad5 = std::make_unique<Instance>();
-	DepthComplexityQuad5->mName = "DepthComplexityQuad5";
-	DepthComplexityQuad5->mMat = mMaterialManager->mMaterials["DepthComplexityColor5"].get();
-	DepthComplexityQuad5->mGeo = mMeshManager->mGeometries["quad"].get();
-	mInstanceManager->AddInstance(std::move(DepthComplexityQuad5), (int)RenderLayer::DepthComplexity5);
 }
 
 void D3D12App::BuildRootSignature()
@@ -768,19 +686,11 @@ void D3D12App::BuildShadersAndInputLayout()
 	mShaders["UIVS"] = d3dUtil::CompileShader(L"Shaders\\UI.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["UIPS"] = d3dUtil::CompileShader(L"Shaders\\UI.hlsl", nullptr, "PS", "ps_5_1");
 
-	mShaders["GreyVS"] = d3dUtil::CompileShader(L"Shaders\\Grey.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["GreyPS"] = d3dUtil::CompileShader(L"Shaders\\Grey.hlsl", nullptr, "PS", "ps_5_1");
+	mDrawQuad->SetShader(mShaders["UIVS"].Get(), mShaders["UIPS"].Get());
+	mDepthComplexityUseStencil->SetShader(mShaders["UIVS"].Get(), mShaders["UIPS"].Get());
 
 	mShaders["skyVS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["skyPS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "PS", "ps_5_1");
-
-	mShaders["horzBlurCS"] = d3dUtil::CompileShader(L"Shaders\\Blur.hlsl", nullptr, "HorzBlurCS", "cs_5_1");
-	mShaders["vertBlurCS"] = d3dUtil::CompileShader(L"Shaders\\Blur.hlsl", nullptr, "VertBlurCS", "cs_5_1");
-
-	mShaders["fullScreenQuadVS"] = d3dUtil::CompileShader(L"Shaders\\FullScreenQuad.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["fullScreenQuadPS"] = d3dUtil::CompileShader(L"Shaders\\FullScreenQuad.hlsl", nullptr, "PS", "ps_5_1");
-
-	mShaders["sobelCS"] = d3dUtil::CompileShader(L"Shaders\\Sobel.hlsl", nullptr, "SobelCS", "cs_5_1");
 
 	mInputLayout =
 	{
@@ -823,13 +733,6 @@ void D3D12App::BuildPSOs()
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaque"])));
 
 	//
-	// 不透明线框物体的PSO
-	//
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaqueWireframePsoDesc = opaquePsoDesc;
-	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&mPSOs["opaque_wireframe"])));
-
-	//
 	// 透明物体
 	//
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPsoDesc = opaquePsoDesc;
@@ -861,121 +764,13 @@ void D3D12App::BuildPSOs()
 	alphaTestedPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(&mPSOs["alphaTested"])));
 
-	//
-	// 计算深度复杂度（使用模板缓冲）
-	//
-	CD3DX12_BLEND_DESC countDepthComplexityBlendState(D3D12_DEFAULT);
-	countDepthComplexityBlendState.RenderTarget[0].RenderTargetWriteMask = 0;
-
-	D3D12_DEPTH_STENCIL_DESC countDepthComplexityDSS;
-	countDepthComplexityDSS.DepthEnable = false;
-	countDepthComplexityDSS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-	countDepthComplexityDSS.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-	countDepthComplexityDSS.StencilEnable = true;
-	countDepthComplexityDSS.StencilReadMask = 0xff;
-	countDepthComplexityDSS.StencilWriteMask = 0xff;
-
-	countDepthComplexityDSS.FrontFace.StencilFailOp = D3D12_STENCIL_OP_INCR;
-	countDepthComplexityDSS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_INCR;
-	countDepthComplexityDSS.FrontFace.StencilPassOp = D3D12_STENCIL_OP_INCR;
-	countDepthComplexityDSS.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-
-	// 我们不绘制背面多边形，所以这些属性无所谓
-	countDepthComplexityDSS.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
-	countDepthComplexityDSS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-	countDepthComplexityDSS.BackFace.StencilPassOp = D3D12_STENCIL_OP_REPLACE;
-	countDepthComplexityDSS.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC countDepthComplexityPsoDesc = opaquePsoDesc;
-	countDepthComplexityPsoDesc.BlendState = countDepthComplexityBlendState;
-	countDepthComplexityPsoDesc.DepthStencilState = countDepthComplexityDSS;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&countDepthComplexityPsoDesc, IID_PPV_ARGS(&mPSOs["countDepthComplexity"])));
-
-	//
-	// 显示深度复杂度（使用模板缓冲）
-	//
-	D3D12_DEPTH_STENCIL_DESC showDepthComplexityDSS;
-	showDepthComplexityDSS.DepthEnable = false;
-	showDepthComplexityDSS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-	showDepthComplexityDSS.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-	showDepthComplexityDSS.StencilEnable = true;
-	showDepthComplexityDSS.StencilReadMask = 0xff;
-	showDepthComplexityDSS.StencilWriteMask = 0xff;
-
-	showDepthComplexityDSS.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
-	showDepthComplexityDSS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-	showDepthComplexityDSS.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
-	showDepthComplexityDSS.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-
-	// 我们不绘制背面多边形，所以这些属性无所谓
-	showDepthComplexityDSS.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
-	showDepthComplexityDSS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-	showDepthComplexityDSS.BackFace.StencilPassOp = D3D12_STENCIL_OP_REPLACE;
-	showDepthComplexityDSS.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC showDepthComplexityPsoDesc = opaquePsoDesc;
-	showDepthComplexityPsoDesc.VS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["UIVS"]->GetBufferPointer()),
-		mShaders["UIVS"]->GetBufferSize()
-	};
-	showDepthComplexityPsoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["UIPS"]->GetBufferPointer()),
-		mShaders["UIPS"]->GetBufferSize()
-	};
-	showDepthComplexityPsoDesc.DepthStencilState = showDepthComplexityDSS;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&showDepthComplexityPsoDesc, IID_PPV_ARGS(&mPSOs["showDepthComplexity"])));
-
-	//
-	// 绘制深度复杂度（使用混合）
-	//
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC showDepthComplexityUseBlendPsoDesc = opaquePsoDesc;
-	showDepthComplexityUseBlendPsoDesc.VS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["GreyVS"]->GetBufferPointer()),
-		mShaders["GreyVS"]->GetBufferSize()
-	};
-	showDepthComplexityUseBlendPsoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["GreyPS"]->GetBufferPointer()),
-		mShaders["GreyPS"]->GetBufferSize()
-	};
-
-	D3D12_RENDER_TARGET_BLEND_DESC showDepthComplexityUseBlendBlendDesc;
-	showDepthComplexityUseBlendBlendDesc.BlendEnable = true;
-	showDepthComplexityUseBlendBlendDesc.LogicOpEnable = false;
-	showDepthComplexityUseBlendBlendDesc.SrcBlend = D3D12_BLEND_ONE;
-	showDepthComplexityUseBlendBlendDesc.DestBlend = D3D12_BLEND_ONE;
-	showDepthComplexityUseBlendBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
-	showDepthComplexityUseBlendBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
-	showDepthComplexityUseBlendBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
-	showDepthComplexityUseBlendBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
-	showDepthComplexityUseBlendBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
-	showDepthComplexityUseBlendBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-
-	D3D12_DEPTH_STENCIL_DESC showDepthComplexityUseBlendDSS;
-	showDepthComplexityUseBlendDSS.DepthEnable = false;
-	showDepthComplexityUseBlendDSS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-	showDepthComplexityUseBlendDSS.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-	showDepthComplexityUseBlendDSS.StencilEnable = false;
-	showDepthComplexityUseBlendDSS.StencilReadMask = 0xff;
-	showDepthComplexityUseBlendDSS.StencilWriteMask = 0xff;
-
-	showDepthComplexityUseBlendDSS.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
-	showDepthComplexityUseBlendDSS.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-	showDepthComplexityUseBlendDSS.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
-	showDepthComplexityUseBlendDSS.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;
-
-	// 我们不绘制背面多边形，所以这些属性无所谓
-	showDepthComplexityUseBlendDSS.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
-	showDepthComplexityUseBlendDSS.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-	showDepthComplexityUseBlendDSS.BackFace.StencilPassOp = D3D12_STENCIL_OP_REPLACE;
-	showDepthComplexityUseBlendDSS.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-
-	showDepthComplexityUseBlendPsoDesc.BlendState.RenderTarget[0] = showDepthComplexityUseBlendBlendDesc;
-	showDepthComplexityUseBlendPsoDesc.DepthStencilState = showDepthComplexityUseBlendDSS;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&showDepthComplexityUseBlendPsoDesc, IID_PPV_ARGS(&mPSOs["showDepthComplexityUseBlend"])));
+	mDrawQuad->SetPSODesc(opaquePsoDesc);
+	mWireframe->SetPSODesc(opaquePsoDesc);
+	mDepthComplexityUseStencil->SetPSODesc(opaquePsoDesc);
+	mDepthComplexityUseBlend->SetPSODesc(opaquePsoDesc);
+	mBlurFilter->SetPSODesc(opaquePsoDesc);
+	mSobelFilter->SetPSODesc(opaquePsoDesc);
+	mInverseFilter->SetPSODesc(opaquePsoDesc);
 
 	//
 	// 天空球
@@ -1000,66 +795,4 @@ void D3D12App::BuildPSOs()
 		mShaders["skyPS"]->GetBufferSize()
 	};
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&skyPsoDesc, IID_PPV_ARGS(&mPSOs["sky"])));
-
-	//
-	// 水平模糊
-	//
-	D3D12_COMPUTE_PIPELINE_STATE_DESC horzBlurPSO = {};
-	horzBlurPSO.pRootSignature = mBlurFilter->GetRootSignature();
-	horzBlurPSO.CS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["horzBlurCS"]->GetBufferPointer()),
-		mShaders["horzBlurCS"]->GetBufferSize()
-	};
-	horzBlurPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&horzBlurPSO, IID_PPV_ARGS(&mPSOs["horzBlur"])));
-
-	//
-	// 垂直模糊
-	//
-	D3D12_COMPUTE_PIPELINE_STATE_DESC vertBlurPSO = {};
-	vertBlurPSO.pRootSignature = mBlurFilter->GetRootSignature();
-	vertBlurPSO.CS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["vertBlurCS"]->GetBufferPointer()),
-		mShaders["vertBlurCS"]->GetBufferSize()
-	};
-	vertBlurPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&vertBlurPSO, IID_PPV_ARGS(&mPSOs["vertBlur"])));
-
-	//
-	// 绘制全屏quad
-	//
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC fullScreenQuadPSO = opaquePsoDesc;
-	fullScreenQuadPSO.pRootSignature = mOffscreenRT->GetRootSignature();
-
-	// 关闭深度测试
-	fullScreenQuadPSO.DepthStencilState.DepthEnable = false;
-	fullScreenQuadPSO.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-	fullScreenQuadPSO.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-
-	fullScreenQuadPSO.VS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["fullScreenQuadVS"]->GetBufferPointer()),
-		mShaders["fullScreenQuadVS"]->GetBufferSize()
-	};
-	fullScreenQuadPSO.PS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["fullScreenQuadPS"]->GetBufferPointer()),
-		mShaders["fullScreenQuadPS"]->GetBufferSize()
-	};
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&fullScreenQuadPSO, IID_PPV_ARGS(&mPSOs["fullScreenQuad"])));
-
-	//
-	// sobel
-	//
-	D3D12_COMPUTE_PIPELINE_STATE_DESC sobelPSO = {};
-	sobelPSO.pRootSignature = mSobelFilter->GetRootSignature();
-	sobelPSO.CS =
-	{
-		reinterpret_cast<BYTE*>(mShaders["sobelCS"]->GetBufferPointer()),
-		mShaders["sobelCS"]->GetBufferSize()
-	};
-	sobelPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&sobelPSO, IID_PPV_ARGS(&mPSOs["sobel"])));
 }
