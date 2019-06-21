@@ -27,6 +27,9 @@ bool D3D12App::Initialize()
 	mRenderTarget = std::make_unique<RenderTarget>(md3dDevice.Get(),
 		mClientWidth, mClientHeight, mBackBufferFormat);
 
+	mShaderResourceTemp = std::make_unique<ShaderResource>(md3dDevice.Get(),
+		mClientWidth, mClientHeight, mBackBufferFormat);
+
 	mDrawQuad = std::make_unique<DrawQuad>(md3dDevice.Get(), mCommandList.Get(),
 		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
 
@@ -43,6 +46,9 @@ bool D3D12App::Initialize()
 		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
 
 	mInverseFilter = std::make_unique<InverseFilter>(md3dDevice.Get(), mCommandList.Get(),
+		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
+
+	mMultiplyFilter = std::make_unique<MultiplyFilter>(md3dDevice.Get(), mCommandList.Get(),
 		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
 
 	BuildTextures();
@@ -78,6 +84,10 @@ void D3D12App::OnResize()
 		mRenderTarget->OnResize(mClientWidth, mClientHeight);
 	}
 
+	if (mShaderResourceTemp != nullptr) {
+		mShaderResourceTemp->OnResize(mClientWidth, mClientHeight);
+	}
+
 	if (mDrawQuad != nullptr) {
 		mDrawQuad->OnResize(mClientWidth, mClientHeight);
 	}
@@ -92,6 +102,10 @@ void D3D12App::OnResize()
 
 	if (mInverseFilter != nullptr) {
 		mInverseFilter->OnResize(mClientWidth, mClientHeight);
+	}
+
+	if (mMultiplyFilter != nullptr) {
+		mMultiplyFilter->OnResize(mClientWidth, mClientHeight);
 	}
 }
 
@@ -195,19 +209,13 @@ void D3D12App::Draw(const GameTimer& gt)
 	//
 
 	if (mIsBlur) {
-		mBlurFilter->CopyIn(mRenderTarget->Resource());
-		mBlurFilter->Execute(4);
-		mBlurFilter->CopyOut(mRenderTarget->Resource());
+		mBlurFilter->ExcuteInOut(mRenderTarget->Resource(), mRenderTarget->Resource(), 4);
 	}
 
 	if (mIsSobel) {
-		mSobelFilter->CopyIn(mRenderTarget->Resource());
-		mSobelFilter->Execute();
-		mSobelFilter->CopyOut(mRenderTarget->Resource());
-
-		mInverseFilter->CopyIn(mRenderTarget->Resource());
-		mInverseFilter->Execute();
-		mInverseFilter->CopyOut(mRenderTarget->Resource());
+		mSobelFilter->ExcuteInOut(mRenderTarget->Resource(), mShaderResourceTemp->Resource());
+		mInverseFilter->ExcuteInOut(mShaderResourceTemp->Resource(), mShaderResourceTemp->Resource());
+		mMultiplyFilter->ExcuteInOut(mRenderTarget->Resource(), mShaderResourceTemp->Resource(), mRenderTarget->Resource());
 	}
 
 
@@ -222,8 +230,7 @@ void D3D12App::Draw(const GameTimer& gt)
 	// 设置渲染目标
 	mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
 
-	mDrawQuad->CopyIn(mRenderTarget->Resource());
-	mDrawQuad->Draw();
+	mDrawQuad->Draw(mRenderTarget->Resource());
 
 	// 改变资源状态
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
@@ -771,6 +778,7 @@ void D3D12App::BuildPSOs()
 	mBlurFilter->SetPSODesc(opaquePsoDesc);
 	mSobelFilter->SetPSODesc(opaquePsoDesc);
 	mInverseFilter->SetPSODesc(opaquePsoDesc);
+	mMultiplyFilter->SetPSODesc(opaquePsoDesc);
 
 	//
 	// 天空球

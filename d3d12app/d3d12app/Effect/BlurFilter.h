@@ -23,6 +23,7 @@ public:
 	void CopyIn(ID3D12Resource* input);
 	void Execute(int blurCount);
 	void CopyOut(ID3D12Resource* output);
+	void ExcuteInOut(ID3D12Resource* input, ID3D12Resource* output, int blurCount);
 
 private:
 	void BuildResources();

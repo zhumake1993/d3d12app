@@ -23,6 +23,7 @@ public:
 
 	void CopyIn(ID3D12Resource* input);
 	void Draw();
+	void Draw(ID3D12Resource* input);
 
 private:
 	void BuildResources();

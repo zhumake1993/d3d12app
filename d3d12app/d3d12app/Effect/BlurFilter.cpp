@@ -68,7 +68,7 @@ void BlurFilter::Execute(int blurCount)
 	mCmdList->SetComputeRoot32BitConstants(0, (UINT)weights.size(), weights.data(), 1);
 
 	mCmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mBlurTex1.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
 	for (int i = 0; i < blurCount; ++i) {
 		//
@@ -132,6 +132,13 @@ void BlurFilter::CopyOut(ID3D12Resource* output)
 
 	mCmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mBlurTex0.Get(),
 		D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_GENERIC_READ));
+}
+
+void BlurFilter::ExcuteInOut(ID3D12Resource* input, ID3D12Resource* output, int blurCount)
+{
+	CopyIn(input);
+	Execute(blurCount);
+	CopyOut(output);
 }
 
 void BlurFilter::BuildResources()

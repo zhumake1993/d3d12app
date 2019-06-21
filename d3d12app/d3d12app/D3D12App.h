@@ -12,6 +12,7 @@
 #include "Common/InstanceManager.h"
 
 #include "Effect/RenderTarget.h"
+#include "Effect/ShaderResource.h"
 #include "Effect/DrawQuad.h"
 #include "Effect/Wireframe.h"
 #include "Effect/DepthComplexityUseStencil.h"
@@ -19,6 +20,7 @@
 #include "Effect/BlurFilter.h"
 #include "Effect/SobelFilter.h"
 #include "Effect/InverseFilter.h"
+#include "Effect/MultiplyFilter.h"
 
 #include "GameObject/Hill.h"
 #include "GameObject/Wave.h"
@@ -83,6 +85,8 @@ private:
 
 	std::unique_ptr<RenderTarget> mRenderTarget = nullptr;
 
+	std::unique_ptr<ShaderResource> mShaderResourceTemp = nullptr;
+
 	std::unique_ptr<DrawQuad> mDrawQuad = nullptr;
 
 	std::unique_ptr<Wireframe> mWireframe = nullptr;
@@ -101,5 +105,6 @@ private:
 	bool mIsSobel = false;
 
 	std::unique_ptr<InverseFilter> mInverseFilter;
+	std::unique_ptr<MultiplyFilter> mMultiplyFilter;
 };
 

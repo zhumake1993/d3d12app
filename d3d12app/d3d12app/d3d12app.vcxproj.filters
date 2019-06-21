@@ -48,6 +48,9 @@
     <FxCompile Include="Shaders\Inverse.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
+    <FxCompile Include="Shaders\Multiply.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D3D12App.cpp">
@@ -117,6 +120,12 @@
       <Filter>Effect</Filter>
     </ClCompile>
     <ClCompile Include="Effect\SobelFilter.cpp">
+      <Filter>Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="Effect\ShaderResource.cpp">
+      <Filter>Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="Effect\MultiplyFilter.cpp">
       <Filter>Effect</Filter>
     </ClCompile>
   </ItemGroup>
@@ -194,6 +203,12 @@
       <Filter>Effect</Filter>
     </ClInclude>
     <ClInclude Include="Effect\SobelFilter.h">
+      <Filter>Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="Effect\ShaderResource.h">
+      <Filter>Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="Effect\MultiplyFilter.h">
       <Filter>Effect</Filter>
     </ClInclude>
   </ItemGroup>

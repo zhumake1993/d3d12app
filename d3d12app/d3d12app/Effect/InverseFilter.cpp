@@ -59,21 +59,19 @@ void InverseFilter::Execute()
 	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptorHeap.Get() };
 	mCmdList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-	mCmdList->SetGraphicsRootSignature(mRootSignature.Get());
+	mCmdList->SetComputeRootSignature(mRootSignature.Get());
 
 	mCmdList->SetPipelineState(mPSO.Get());
 
-	mCmdList->SetGraphicsRootDescriptorTable(0, mInputGpuSrv);
-	mCmdList->SetGraphicsRootDescriptorTable(1, mOutputGpuUav);
+	mCmdList->SetComputeRootDescriptorTable(0, mInputGpuSrv);
+	mCmdList->SetComputeRootDescriptorTable(1, mOutputGpuUav);
 
 	mCmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mOutput.Get(),
 		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
-	// 使用着色器中的SV_VertexID来构建顶点
-	mCmdList->IASetVertexBuffers(0, 1, nullptr);
-	mCmdList->IASetIndexBuffer(nullptr);
-	mCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	mCmdList->DrawInstanced(6, 1, 0, 0);
+	UINT numGroupsX = (UINT)ceilf(mWidth / 16.0f);
+	UINT numGroupsY = (UINT)ceilf(mHeight / 16.0f);
+	mCmdList->Dispatch(numGroupsX, numGroupsY, 1);
 
 	mCmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mOutput.Get(),
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
@@ -94,6 +92,13 @@ void InverseFilter::CopyOut(ID3D12Resource* output)
 
 	mCmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mOutput.Get(),
 		D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_GENERIC_READ));
+}
+
+void InverseFilter::ExcuteInOut(ID3D12Resource* input, ID3D12Resource* output)
+{
+	CopyIn(input);
+	Execute();
+	CopyOut(output);
 }
 
 void InverseFilter::BuildResources()
@@ -144,7 +149,7 @@ void InverseFilter::BuildRootSignature()
 
 	auto staticSamplers = d3dUtil::GetStaticSamplers();
 
-	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter,
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(_countof(slotRootParameter), slotRootParameter,
 		(UINT)staticSamplers.size(), staticSamplers.data(),
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
@@ -169,7 +174,7 @@ void InverseFilter::BuildDescriptors()
 {
 	// 创建SRV堆
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 3;
+	srvHeapDesc.NumDescriptors = 2;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
@@ -179,11 +184,9 @@ void InverseFilter::BuildDescriptors()
 
 	// 保留描述符的引用
 	mInputCpuSrv = hCpuDescriptor;
-	mInputGpuSrv = hGpuDescriptor;
-
-	mOutputCpuSrv = hCpuDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
 	mOutputCpuUav = hCpuDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
-	mOutputGpuSrv = hGpuDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
+
+	mInputGpuSrv = hGpuDescriptor;
 	mOutputGpuUav = hGpuDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
 
 	// 创建描述符
@@ -200,29 +203,23 @@ void InverseFilter::BuildDescriptors()
 	uavDesc.Texture2D.MipSlice = 0;
 
 	md3dDevice->CreateShaderResourceView(mInput.Get(), &srvDesc, mInputCpuSrv);
-	md3dDevice->CreateShaderResourceView(mOutput.Get(), &srvDesc, mOutputCpuSrv);
 	md3dDevice->CreateUnorderedAccessView(mOutput.Get(), nullptr, &uavDesc, mOutputCpuUav);
 }
 
 void InverseFilter::BuildShader()
 {
-	mInverseVS = d3dUtil::CompileShader(L"Shaders\\Inverse.hlsl", nullptr, "VS", "vs_5_1");
-	mInversePS = d3dUtil::CompileShader(L"Shaders\\Inverse.hlsl", nullptr, "PS", "ps_5_1");
+	mInverseCS = d3dUtil::CompileShader(L"Shaders\\Inverse.hlsl", nullptr, "InverseCS", "cs_5_1");
 }
 
 void InverseFilter::BuildPSOs()
 {
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC inversePSODesc = mOpaquePsoDesc;
+	D3D12_COMPUTE_PIPELINE_STATE_DESC inversePSODesc = {};
 	inversePSODesc.pRootSignature = mRootSignature.Get();
-	inversePSODesc.VS =
+	inversePSODesc.CS =
 	{
-		reinterpret_cast<BYTE*>(mInverseVS->GetBufferPointer()),
-		mInverseVS->GetBufferSize()
+		reinterpret_cast<BYTE*>(mInverseCS->GetBufferPointer()),
+		mInverseCS->GetBufferSize()
 	};
-	inversePSODesc.PS =
-	{
-		reinterpret_cast<BYTE*>(mInversePS->GetBufferPointer()),
-		mInversePS->GetBufferSize()
-	};
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&inversePSODesc, IID_PPV_ARGS(&mPSO)));
+	inversePSODesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&inversePSODesc, IID_PPV_ARGS(&mPSO)));
 }

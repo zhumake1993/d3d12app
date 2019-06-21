@@ -95,6 +95,13 @@ void SobelFilter::CopyOut(ID3D12Resource* output)
 		D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
+void SobelFilter::ExcuteInOut(ID3D12Resource* input, ID3D12Resource* output)
+{
+	CopyIn(input);
+	Execute();
+	CopyOut(output);
+}
+
 void SobelFilter::BuildResources()
 {
 	D3D12_RESOURCE_DESC texDesc;
@@ -168,7 +175,7 @@ void SobelFilter::BuildDescriptors()
 {
 	// 创建SRV堆
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 3;
+	srvHeapDesc.NumDescriptors = 2;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
@@ -178,11 +185,9 @@ void SobelFilter::BuildDescriptors()
 
 	// 保留描述符的引用
 	mInputCpuSrv = hCpuDescriptor;
-	mInputGpuSrv = hGpuDescriptor;
-
-	mOutputCpuSrv = hCpuDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
 	mOutputCpuUav = hCpuDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
-	mOutputGpuSrv = hGpuDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
+
+	mInputGpuSrv = hGpuDescriptor;
 	mOutputGpuUav = hGpuDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
 
 	// 创建描述符
@@ -199,7 +204,6 @@ void SobelFilter::BuildDescriptors()
 	uavDesc.Texture2D.MipSlice = 0;
 
 	md3dDevice->CreateShaderResourceView(mInput.Get(), &srvDesc, mInputCpuSrv);
-	md3dDevice->CreateShaderResourceView(mOutput.Get(), &srvDesc, mOutputCpuSrv);
 	md3dDevice->CreateUnorderedAccessView(mOutput.Get(), nullptr, &uavDesc, mOutputCpuUav);
 }
 

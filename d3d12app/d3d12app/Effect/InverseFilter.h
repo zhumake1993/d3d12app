@@ -23,6 +23,7 @@ public:
 	void CopyIn(ID3D12Resource* input);
 	void Execute();
 	void CopyOut(ID3D12Resource* output);
+	void ExcuteInOut(ID3D12Resource* input, ID3D12Resource* output);
 
 private:
 	void BuildResources();
@@ -41,8 +42,7 @@ private:
 	ComPtr<ID3D12DescriptorHeap> mCbvSrvUavDescriptorHeap = nullptr;
 	UINT mCbvSrvUavDescriptorSize;
 
-	ComPtr<ID3DBlob> mInverseVS;
-	ComPtr<ID3DBlob> mInversePS;
+	ComPtr<ID3DBlob> mInverseCS;
 
 	ComPtr<ID3D12PipelineState> mPSO;
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC mOpaquePsoDesc;
@@ -56,8 +56,6 @@ private:
 	CD3DX12_GPU_DESCRIPTOR_HANDLE mInputGpuSrv;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> mOutput = nullptr;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE mOutputCpuSrv;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE mOutputCpuUav;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE mOutputGpuSrv;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE mOutputGpuUav;
 };

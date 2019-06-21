@@ -84,6 +84,12 @@ void DrawQuad::Draw()
 	mCmdList->DrawInstanced(6, 1, 0, 0);
 }
 
+void DrawQuad::Draw(ID3D12Resource* input)
+{
+	CopyIn(input);
+	Draw();
+}
+
 void DrawQuad::BuildResources()
 {
 	// 注意：压缩格式不兼容UAV
