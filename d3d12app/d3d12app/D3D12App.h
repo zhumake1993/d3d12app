@@ -6,10 +6,12 @@
 #include "Common/FrameResource.h"
 #include "Common/GeometryGenerator.h"
 #include "Common/Camera.h"
-#include "Common/TextureManager.h"
-#include "Common/MaterialManager.h"
-#include "Common/MeshManager.h"
-#include "Common/InstanceManager.h"
+
+#include "Manager/GameObjectManager.h"
+#include "Manager/InstanceManager.h"
+#include "Manager/TextureManager.h"
+#include "Manager/MaterialManager.h"
+#include "Manager/MeshManager.h"
 
 #include "Effect/RenderTarget.h"
 #include "Effect/ShaderResource.h"
@@ -22,8 +24,8 @@
 #include "Effect/InverseFilter.h"
 #include "Effect/MultiplyFilter.h"
 
-#include "GameObject/Hill.h"
-#include "GameObject/Wave.h"
+//#include "GameObject/Hill.h"
+//#include "GameObject/Wave.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -56,20 +58,23 @@ private:
 
 	void UpdateFrameResource(const GameTimer& gt);
 
+	void BuildManagers();
+	void BuildEffects();
 	void BuildTextures();
 	void BuildMaterials();
 	void BuildMeshes();
-	void BuildInstances();
+	void BuildGameObjects();
 
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
 	void BuildPSOs();
 
 private:
-	std::unique_ptr<TextureManager> mTextureManager;
-	std::unique_ptr<MaterialManager> mMaterialManager;
-	std::unique_ptr<MeshManager> mMeshManager;
-	std::unique_ptr<InstanceManager> mInstanceManager;
+	std::shared_ptr<TextureManager> mTextureManager;
+	std::shared_ptr<MaterialManager> mMaterialManager;
+	std::shared_ptr<MeshManager> mMeshManager;
+	std::shared_ptr<InstanceManager> mInstanceManager;
+	std::shared_ptr<GameObjectManager> mGameObjectManager;
 
 	ComPtr<ID3D12RootSignature> mRootSignature = nullptr; // 根签名
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders; // 着色器

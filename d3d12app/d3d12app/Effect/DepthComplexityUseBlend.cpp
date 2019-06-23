@@ -16,7 +16,7 @@ void DepthComplexityUseBlend::SetPSODesc(D3D12_GRAPHICS_PIPELINE_STATE_DESC& opa
 	BuildPSOs();
 }
 
-void DepthComplexityUseBlend::Draw(std::unique_ptr<InstanceManager>& instanceManager)
+void DepthComplexityUseBlend::Draw(std::shared_ptr<InstanceManager> instanceManager)
 {
 	mCmdList->SetPipelineState(mShowDepthComplexityUseBlendPSO.Get());
 	instanceManager->Draw(mCmdList, (int)RenderLayer::Opaque);

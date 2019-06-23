@@ -19,6 +19,9 @@
     <Filter Include="Effect">
       <UniqueIdentifier>{f29bb2c2-7b31-43bf-ac0e-c23ece82332c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Manager">
+      <UniqueIdentifier>{84783fb6-0712-4c89-b204-6405593d4abb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\Common.hlsl">
@@ -80,24 +83,6 @@
     <ClCompile Include="Common\MathHelper.cpp">
       <Filter>Common</Filter>
     </ClCompile>
-    <ClCompile Include="Common\InstanceManager.cpp">
-      <Filter>Common</Filter>
-    </ClCompile>
-    <ClCompile Include="Common\TextureManager.cpp">
-      <Filter>Common</Filter>
-    </ClCompile>
-    <ClCompile Include="Common\MaterialManager.cpp">
-      <Filter>Common</Filter>
-    </ClCompile>
-    <ClCompile Include="Common\MeshManager.cpp">
-      <Filter>Common</Filter>
-    </ClCompile>
-    <ClCompile Include="GameObject\Hill.cpp">
-      <Filter>GameObject</Filter>
-    </ClCompile>
-    <ClCompile Include="GameObject\Wave.cpp">
-      <Filter>GameObject</Filter>
-    </ClCompile>
     <ClCompile Include="Effect\Wireframe.cpp">
       <Filter>Effect</Filter>
     </ClCompile>
@@ -127,6 +112,27 @@
     </ClCompile>
     <ClCompile Include="Effect\MultiplyFilter.cpp">
       <Filter>Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="Manager\Instance.cpp">
+      <Filter>Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Manager\InstanceManager.cpp">
+      <Filter>Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Manager\MaterialManager.cpp">
+      <Filter>Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Manager\MeshManager.cpp">
+      <Filter>Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Manager\TextureManager.cpp">
+      <Filter>Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Manager\GameObject.cpp">
+      <Filter>Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Manager\GameObjectManager.cpp">
+      <Filter>Manager</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -163,24 +169,6 @@
     <ClInclude Include="Common\UploadBuffer.h">
       <Filter>Common</Filter>
     </ClInclude>
-    <ClInclude Include="Common\InstanceManager.h">
-      <Filter>Common</Filter>
-    </ClInclude>
-    <ClInclude Include="Common\TextureManager.h">
-      <Filter>Common</Filter>
-    </ClInclude>
-    <ClInclude Include="Common\MaterialManager.h">
-      <Filter>Common</Filter>
-    </ClInclude>
-    <ClInclude Include="Common\MeshManager.h">
-      <Filter>Common</Filter>
-    </ClInclude>
-    <ClInclude Include="GameObject\Hill.h">
-      <Filter>GameObject</Filter>
-    </ClInclude>
-    <ClInclude Include="GameObject\Wave.h">
-      <Filter>GameObject</Filter>
-    </ClInclude>
     <ClInclude Include="Effect\Wireframe.h">
       <Filter>Effect</Filter>
     </ClInclude>
@@ -210,6 +198,27 @@
     </ClInclude>
     <ClInclude Include="Effect\MultiplyFilter.h">
       <Filter>Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="Manager\Instance.h">
+      <Filter>Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Manager\InstanceManager.h">
+      <Filter>Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Manager\MaterialManager.h">
+      <Filter>Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Manager\MeshManager.h">
+      <Filter>Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Manager\TextureManager.h">
+      <Filter>Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Manager\GameObject.h">
+      <Filter>Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Manager\GameObjectManager.h">
+      <Filter>Manager</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
