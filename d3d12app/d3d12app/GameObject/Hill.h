@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../Common/InstanceManager.h"
+#include "../Manager/GameObjectManager.h"
 
 class Hill :
-	public Instance
+	public GameObject
 {
 public:
 	Hill();

@@ -24,8 +24,8 @@
 #include "Effect/InverseFilter.h"
 #include "Effect/MultiplyFilter.h"
 
-//#include "GameObject/Hill.h"
-//#include "GameObject/Wave.h"
+#include "GameObject/Hill.h"
+#include "GameObject/Wave.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -84,7 +84,7 @@ private:
 	std::unique_ptr<MainFrameResource> mMainFrameResource; // Main帧资源
 	std::unique_ptr<FrameResource<PassConstants>> mPassCB; // passCB帧资源
 
-	Camera mCamera;
+	std::shared_ptr<Camera> mCamera;
 
 	POINT mLastMousePos;
 

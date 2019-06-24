@@ -48,7 +48,7 @@ VertexOut VS(VertexIn vin, uint instanceID : SV_InstanceID)
     // 变换到其次剪裁空间
     vout.PosH = mul(posW, gViewProj);
 
-	float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), matIndex);
+	float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), texTransform);
 	vout.TexC = mul(texC, matData.MatTransform).xy;
 
     return vout;

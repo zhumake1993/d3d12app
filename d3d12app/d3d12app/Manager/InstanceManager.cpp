@@ -32,14 +32,14 @@ void InstanceManager::AddInstance(const std::string& gameObjectName, const XMFLO
 	} else {
 		// ¸ÃmeshName²»´æÔÚ
 
-		if (mMeshManager->mGeometries.find(meshName) == mMeshManager->mGeometries.end()) {
+		if (mMeshManager->mMeshes.find(meshName) == mMeshManager->mMeshes.end()) {
 			OutputMessageBox("Can not find the mesh!");
 			return;
 		}
 
 		auto instance = std::make_unique<Instance>(mDevice);
 		instance->mMeshName = meshName;
-		instance->mMesh = mMeshManager->mGeometries[meshName];
+		instance->mMesh = mMeshManager->mMeshes[meshName];
 		instance->CalculateBoundingBox();
 
 		instance->AddInstanceData(gameObjectName, world, mMaterialManager->GetIndex(matName), texTransform);
@@ -48,17 +48,11 @@ void InstanceManager::AddInstance(const std::string& gameObjectName, const XMFLO
 	}
 }
 
-void InstanceManager::InstanceDataChange(const std::string& gameObjectName, const std::string& meshName, const int randerLayer)
-{
-	auto& instanceMap = mInstanceLayers[randerLayer];
-	instanceMap[meshName]->InstanceDataChange(gameObjectName);
-}
-
-void InstanceManager::UpdateInstanceData()
+void InstanceManager::UpdateInstanceData(std::shared_ptr<Camera> camera)
 {
 	for (auto &layer : mInstanceLayers) {
 		for (auto& p : layer) {
-			p.second->UpdateInstanceData();
+			p.second->UpdateInstanceData(camera);
 		}
 	}
 }

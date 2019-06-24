@@ -1,7 +1,7 @@
 #include "Hill.h"
 
 Hill::Hill()
-	:Instance()
+	:GameObject()
 {
 }
 
@@ -11,5 +11,4 @@ Hill::~Hill()
 
 void Hill::Update(const GameTimer& gt)
 {
-	//
 }

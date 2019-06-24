@@ -3,7 +3,7 @@
 #include <ppl.h>
 
 Wave::Wave(int m, int n, float dx, float dt, float speed, float damping)
-	:Instance()
+	:GameObject()
 {
 	mNumRows = m;
 	mNumCols = n;
@@ -196,12 +196,16 @@ void Wave::Update(const GameTimer& gt)
 	}
 
 	// 将波浪渲染项的动态顶点缓冲设置为当前帧的顶点缓冲
-	mGeo->VertexBufferGPU = currWavesVB->Resource();
-	mGeo->VertexBufferView.BufferLocation = mGeo->VertexBufferGPU->GetGPUVirtualAddress();
+	auto mesh = mInstanceManager->mInstanceLayers[mRenderLayer][mMeshName]->GetMesh();
+
+	mesh->VertexBufferGPU = currWavesVB->Resource();
+	mesh->VertexBufferView.BufferLocation = mesh->VertexBufferGPU->GetGPUVirtualAddress();
 
 	// 更新纹理转换矩阵，营造一种流动的感觉
-	float& tu = mMat->mMatTransform(3, 0);
-	float& tv = mMat->mMatTransform(3, 1);
+	auto mat = mMaterialManager->GetMaterialData(mMatName);
+
+	float& tu = mat.MatTransform(3, 0);
+	float& tv = mat.MatTransform(3, 1);
 
 	tu += 0.1f * gt.DeltaTime();
 	tv += 0.02f * gt.DeltaTime();
@@ -212,8 +216,8 @@ void Wave::Update(const GameTimer& gt)
 	if (tv >= 1.0f)
 		tv -= 1.0f;
 
-	mMat->mMatTransform(3, 0) = tu;
-	mMat->mMatTransform(3, 1) = tv;
+	mat.MatTransform(3, 0) = tu;
+	mat.MatTransform(3, 1) = tv;
 
-	mMat->Change();
+	mMaterialManager->SetMaterialData(mMatName, mat);
 }

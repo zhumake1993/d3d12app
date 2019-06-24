@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Common/d3dUtil.h"
+#include "../Common/Camera.h"
 #include "../Common/UploadBuffer.h"
 #include "MeshManager.h"
 
@@ -25,14 +26,14 @@ public:
 	Instance(ID3D12Device* device);
 	virtual ~Instance();
 
+	std::shared_ptr<Mesh> GetMesh();
+
 	void CalculateBoundingBox();
 
 	void AddInstanceData(const std::string& gameObjectName, const XMFLOAT4X4& world,
 		const UINT& matIndex, const XMFLOAT4X4& texTransform);
 
-	void InstanceDataChange(const std::string& gameObjectName);
-
-	void UpdateInstanceData();
+	void UpdateInstanceData(std::shared_ptr<Camera> camera);
 
 	void Draw(ID3D12GraphicsCommandList* cmdList);
 
@@ -52,9 +53,9 @@ private:
 	UINT mInstanceCount = 0;
 	std::vector<std::unique_ptr<UploadBuffer<InstanceData>>> mFrameResources; // 帧资源vector
 
+	UINT mVisibleCount = 0;
+
 	BoundingBox mBounds;
 
 	std::unordered_map<std::string, InstanceData> mInstances;
-	std::unordered_map<std::string, UINT> mIndices;
-	std::unordered_map<std::string, int> mNumFramesDirties; // 指示对象数据发生变化
 };

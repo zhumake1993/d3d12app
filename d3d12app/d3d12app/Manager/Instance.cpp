@@ -11,11 +11,16 @@ Instance::~Instance()
 {
 }
 
+std::shared_ptr<Mesh> Instance::GetMesh()
+{
+	return mMesh;
+}
+
 void Instance::CalculateBoundingBox()
 {
-	//
-	//
-	//
+	auto vertices = (Vertex*)mMesh->VertexBufferCPU->GetBufferPointer();
+	auto size = mMesh->VertexBufferByteSize / mMesh->VertexByteStride;
+	BoundingBox::CreateFromPoints(mBounds, size, &vertices[0].Pos, sizeof(Vertex));
 }
 
 void Instance::AddInstanceData(const std::string& gameObjectName, const XMFLOAT4X4& world, const UINT& matIndex, const XMFLOAT4X4& texTransform)
@@ -36,37 +41,42 @@ void Instance::AddInstanceData(const std::string& gameObjectName, const XMFLOAT4
 	instance.TexTransform = texTransform;
 
 	mInstances[gameObjectName] = instance;
-	mIndices[gameObjectName] = mInstanceCount;
-	mNumFramesDirties[gameObjectName] = gNumFrameResources;
 
 	++mInstanceCount;
 }
 
-void Instance::InstanceDataChange(const std::string& gameObjectName)
-{
-	mNumFramesDirties[gameObjectName] = gNumFrameResources;
-}
-
-void Instance::UpdateInstanceData()
+void Instance::UpdateInstanceData(std::shared_ptr<Camera> camera)
 {
 	auto& uploadBuffer = mFrameResources[gCurrFrameResourceIndex];
 
+	XMMATRIX view = camera->GetView();
+	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
+
+	mVisibleCount = 0;
 	for (auto& p : mInstances) {
-		if (mNumFramesDirties[p.first] > 0) {
+		XMMATRIX world = XMLoadFloat4x4(&p.second.World);
+		XMMATRIX invWorld = XMMatrixInverse(&XMMatrixDeterminant(world), world);
+		XMMATRIX viewToLocal = XMMatrixMultiply(invView, invWorld);
+
+		// 将平截头从视坐标空间转换到物体的局部坐标空间
+		BoundingFrustum localSpaceFrustum;
+		camera->mCamFrustum.Transform(localSpaceFrustum, viewToLocal);
+
+		// 平截头剔除
+		if ((localSpaceFrustum.Contains(mBounds) != DirectX::DISJOINT) || (camera->mFrustumCullingEnabled == false)) {
 
 			XMMATRIX world = XMLoadFloat4x4(&p.second.World);
 			XMMATRIX inverseTransposeWorld = XMLoadFloat4x4(&p.second.InverseTransposeWorld);
 			XMMATRIX texTransform = XMLoadFloat4x4(&p.second.TexTransform);
 
 			InstanceData instanceData;
+
 			XMStoreFloat4x4(&instanceData.World, XMMatrixTranspose(world));
 			XMStoreFloat4x4(&instanceData.InverseTransposeWorld, XMMatrixTranspose(inverseTransposeWorld));
 			XMStoreFloat4x4(&instanceData.TexTransform, XMMatrixTranspose(texTransform));
 			instanceData.MaterialIndex = p.second.MaterialIndex;
 
-			uploadBuffer->CopyData(mIndices[p.first], instanceData);
-
-			--mNumFramesDirties[p.first];
+			uploadBuffer->CopyData(mVisibleCount++, instanceData);
 		}
 	}
 }
@@ -80,6 +90,6 @@ void Instance::Draw(ID3D12GraphicsCommandList* cmdList)
 	auto instanceBuffer = mFrameResources[gCurrFrameResourceIndex]->Resource();
 	cmdList->SetGraphicsRootShaderResourceView(0, instanceBuffer->GetGPUVirtualAddress());
 
-	cmdList->DrawIndexedInstanced(mMesh->IndexCount, mInstanceCount, 0, 0, 0);
+	cmdList->DrawIndexedInstanced(mMesh->IndexCount, mVisibleCount, 0, 0, 0);
 }
 

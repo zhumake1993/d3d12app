@@ -1,7 +1,8 @@
 #pragma once
 
 #include "../Common/d3dUtil.h"
-#include "../Manager/InstanceManager.h"
+#include "InstanceManager.h"
+#include "MaterialManager.h"
 #include "GameObject.h"
 
 using namespace DirectX;
@@ -13,6 +14,7 @@ public:
 	~GameObjectManager();
 
 	void SetInstanceManager(std::shared_ptr<InstanceManager> instanceManager);
+	void SetMaterialManager(std::shared_ptr<MaterialManager> materialManager);
 
 	void AddGameObject(std::unique_ptr<GameObject> gameObject);
 
@@ -26,4 +28,5 @@ public:
 
 private:
 	std::shared_ptr<InstanceManager> mInstanceManager;
+	std::shared_ptr<MaterialManager> mMaterialManager;
 };

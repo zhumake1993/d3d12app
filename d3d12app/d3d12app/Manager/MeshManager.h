@@ -35,14 +35,14 @@ public:
 	MeshManager(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
 	~MeshManager();
 
-	void AddGeometry(std::string Name,  GeometryGenerator::MeshData mesh);
-	void AddGeometry(std::string Name, std::vector<Vertex> &vertices, std::vector<std::uint16_t> &indices);
-	void DeleteGeometry(std::string Name);
+	void AddMesh(std::string Name,  GeometryGenerator::MeshData mesh);
+	void AddMesh(std::string Name, std::vector<Vertex> &vertices, std::vector<std::uint16_t> &indices);
+	void DeleteMesh(std::string Name);
 
 private:
 
 public:
-	std::unordered_map<std::string, std::shared_ptr<Mesh>> mGeometries;
+	std::unordered_map<std::string, std::shared_ptr<Mesh>> mMeshes;
 
 private:
 	ID3D12Device* mDevice;

@@ -17,7 +17,9 @@ bool D3D12App::Initialize()
 	// 重置指令列表，为初始化指令做准备
 	ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
 
-	mCamera.SetPosition(0.0f, 2.0f, -15.0f);
+	mCamera = std::make_shared<Camera>();
+	mCamera->SetPosition(0.0f, 2.0f, -15.0f);
+	mCamera->SetLens(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 
 	BuildManagers();
 	BuildEffects();
@@ -48,7 +50,9 @@ void D3D12App::OnResize()
 {
 	D3DApp::OnResize();
 
-	mCamera.SetLens(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+	if (mCamera != nullptr) {
+		mCamera->SetLens(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+	}
 
 	if (mRenderTarget != nullptr) {
 		mRenderTarget->OnResize(mClientWidth, mClientHeight);
@@ -97,7 +101,7 @@ void D3D12App::Update(const GameTimer& gt)
 	}
 
 	mMaterialManager->UpdateMaterialData();
-	mInstanceManager->UpdateInstanceData();
+	mInstanceManager->UpdateInstanceData(mCamera);
 	mGameObjectManager->Update(gt);
 	UpdateFrameResource(gt);
 }
@@ -245,8 +249,8 @@ void D3D12App::OnMouseMove(WPARAM btnState, int x, int y)
 		float dx = XMConvertToRadians(0.25f * static_cast<float>(x - mLastMousePos.x));
 		float dy = XMConvertToRadians(0.25f * static_cast<float>(y - mLastMousePos.y));
 
-		mCamera.Pitch(dy);
-		mCamera.RotateY(dx);
+		mCamera->Pitch(dy);
+		mCamera->RotateY(dx);
 	}
 
 	mLastMousePos.x = x;
@@ -280,6 +284,10 @@ void D3D12App::OnKeyDown(WPARAM vkCode)
 	if (vkCode == '5') {
 		mIsSobel = !mIsSobel;
 	}
+
+	if (vkCode == '6') {
+		mCamera->mFrustumCullingEnabled = !mCamera->mFrustumCullingEnabled;
+	}
 }
 
 void D3D12App::OnKeyUp(WPARAM vkCode)
@@ -291,30 +299,30 @@ void D3D12App::OnKeyboardInput(const GameTimer& gt)
 	const float dt = gt.DeltaTime();
 
 	if (GetAsyncKeyState('W') & 0x8000)
-		mCamera.Walk(10.0f * dt);
+		mCamera->Walk(10.0f * dt);
 
 	if (GetAsyncKeyState('S') & 0x8000)
-		mCamera.Walk(-10.0f * dt);
+		mCamera->Walk(-10.0f * dt);
 
 	if (GetAsyncKeyState('A') & 0x8000)
-		mCamera.Strafe(-10.0f * dt);
+		mCamera->Strafe(-10.0f * dt);
 
 	if (GetAsyncKeyState('D') & 0x8000)
-		mCamera.Strafe(10.0f * dt);
+		mCamera->Strafe(10.0f * dt);
 
 	if (GetAsyncKeyState('Q') & 0x8000)
-		mCamera.FlyUp(10.0f * dt);
+		mCamera->FlyUp(10.0f * dt);
 
 	if (GetAsyncKeyState('E') & 0x8000)
-		mCamera.FlyDown(10.0f * dt);
+		mCamera->FlyDown(10.0f * dt);
 }
 
 void D3D12App::UpdateFrameResource(const GameTimer& gt)
 {
 	PassConstants mainPassCB;
 
-	XMMATRIX view = mCamera.GetView();
-	XMMATRIX proj = mCamera.GetProj();
+	XMMATRIX view = mCamera->GetView();
+	XMMATRIX proj = mCamera->GetProj();
 
 	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
 	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
@@ -327,7 +335,7 @@ void D3D12App::UpdateFrameResource(const GameTimer& gt)
 	XMStoreFloat4x4(&mainPassCB.InvProj, XMMatrixTranspose(invProj));
 	XMStoreFloat4x4(&mainPassCB.ViewProj, XMMatrixTranspose(viewProj));
 	XMStoreFloat4x4(&mainPassCB.InvViewProj, XMMatrixTranspose(invViewProj));
-	mainPassCB.EyePosW = mCamera.GetPosition3f();
+	mainPassCB.EyePosW = mCamera->GetPosition3f();
 	mainPassCB.RenderTargetSize = XMFLOAT2((float)mClientWidth, (float)mClientHeight);
 	mainPassCB.InvRenderTargetSize = XMFLOAT2(1.0f / mClientWidth, 1.0f / mClientHeight);
 	mainPassCB.NearZ = 1.0f;
@@ -359,6 +367,7 @@ void D3D12App::BuildManagers()
 
 	mGameObjectManager = std::make_shared<GameObjectManager>();
 	mGameObjectManager->SetInstanceManager(mInstanceManager);
+	mGameObjectManager->SetMaterialManager(mMaterialManager);
 }
 
 void D3D12App::BuildEffects()
@@ -406,7 +415,8 @@ void D3D12App::BuildTextures()
 		L"Textures/grass.dds",
 		L"Textures/water1.dds",
 		L"Textures/WoodCrate01.dds",
-		L"Textures/WireFence.dds"
+		L"Textures/WireFence.dds",
+		L"Textures/ice.dds"
 	};
 
 	std::wstring cubeMapFileName = L"Textures/snowcube1024.dds";
@@ -492,70 +502,134 @@ void D3D12App::BuildMaterials()
 	wirefence.FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	wirefence.Roughness = 0.25f;
 	mMaterialManager->AddMaterial("wirefence", wirefence);
+
+	MaterialData ice;
+	ice.DiffuseMapIndex = mTextureManager->GetIndex("ice");
+	ice.NormalMapIndex = mTextureManager->GetIndex("default_nmap");
+	ice.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	ice.FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+	ice.Roughness = 0.0f;
+	mMaterialManager->AddMaterial("ice", ice);
 }
 
 void D3D12App::BuildMeshes()
 {
 	GeometryGenerator geoGen;
-	mMeshManager->AddGeometry("box", geoGen.CreateBox(1.0f, 1.0f, 1.0f, 3));
-	mMeshManager->AddGeometry("grid", geoGen.CreateGrid(20.0f, 30.0f, 60, 40));
-	mMeshManager->AddGeometry("sphere", geoGen.CreateSphere(0.5f, 20, 20));
-	mMeshManager->AddGeometry("cylinder", geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20));
+	mMeshManager->AddMesh("box", geoGen.CreateBox(1.0f, 1.0f, 1.0f, 3));
+	mMeshManager->AddMesh("grid", geoGen.CreateGrid(20.0f, 30.0f, 60, 40));
+	mMeshManager->AddMesh("sphere", geoGen.CreateSphere(0.5f, 20, 20));
+	mMeshManager->AddMesh("cylinder", geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20));
+	mMeshManager->AddMesh("box2", geoGen.CreateBox(8.0f, 8.0f, 8.0f, 3));
 
-	//auto hill = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
-	//for (auto& v : hill.Vertices) {
-	//	v.Position.y = 0.3f * (v.Position.z * sinf(0.1f * v.Position.x) + v.Position.x * cosf(0.1f * v.Position.z));
+	auto hill = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
+	for (auto& v : hill.Vertices) {
+		v.Position.y = 0.3f * (v.Position.z * sinf(0.1f * v.Position.x) + v.Position.x * cosf(0.1f * v.Position.z));
 
-	//	XMFLOAT3 n(
-	//		-0.03f * v.Position.z * cosf(0.1f * v.Position.x) - 0.3f * cosf(0.1f * v.Position.z),
-	//		1.0f,
-	//		-0.3f * sinf(0.1f * v.Position.x) + 0.03f * v.Position.x * sinf(0.1f * v.Position.z));
+		XMFLOAT3 n(
+			-0.03f * v.Position.z * cosf(0.1f * v.Position.x) - 0.3f * cosf(0.1f * v.Position.z),
+			1.0f,
+			-0.3f * sinf(0.1f * v.Position.x) + 0.03f * v.Position.x * sinf(0.1f * v.Position.z));
 
-	//	XMVECTOR unitNormal = XMVector3Normalize(XMLoadFloat3(&n));
-	//	XMStoreFloat3(&n, unitNormal);
-	//	v.Normal = n;
-	//}
-	//mMeshManager->AddGeometry("hill", hill);
-	//
-	//auto wave = std::make_unique<Wave>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
-	//// 顶点
-	//std::vector<Vertex> vertices(wave->VertexCount());
-	//for (int i = 0; i < wave->VertexCount(); ++i) {
-	//	vertices[i].Pos = wave->Position(i);
-	//	vertices[i].Normal = wave->Normal(i);
-	//	vertices[i].TexC.x = 0.5f + vertices[i].Pos.x / wave->Width();
-	//	vertices[i].TexC.y = 0.5f - vertices[i].Pos.z / wave->Depth();
-	//}
-	//// 索引
-	//std::vector<std::uint16_t> indices(3 * wave->TriangleCount());
-	//assert(wave->VertexCount() < 0x0000ffff);
-	//int m = wave->RowCount();
-	//int n = wave->ColumnCount();
-	//int k = 0;
-	//for (int i = 0; i < m - 1; ++i) {
-	//	for (int j = 0; j < n - 1; ++j) {
-	//		indices[k] = i * n + j;
-	//		indices[k + 1] = i * n + j + 1;
-	//		indices[k + 2] = (i + 1) * n + j;
+		XMVECTOR unitNormal = XMVector3Normalize(XMLoadFloat3(&n));
+		XMStoreFloat3(&n, unitNormal);
+		v.Normal = n;
+	}
+	mMeshManager->AddMesh("hill", hill);
+	
+	auto wave = std::make_unique<Wave>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
+	// 顶点
+	std::vector<Vertex> vertices(wave->VertexCount());
+	for (int i = 0; i < wave->VertexCount(); ++i) {
+		vertices[i].Pos = wave->Position(i);
+		vertices[i].Normal = wave->Normal(i);
+		vertices[i].TexC.x = 0.5f + vertices[i].Pos.x / wave->Width();
+		vertices[i].TexC.y = 0.5f - vertices[i].Pos.z / wave->Depth();
+	}
+	// 索引
+	std::vector<std::uint16_t> indices(3 * wave->TriangleCount());
+	assert(wave->VertexCount() < 0x0000ffff);
+	int m = wave->RowCount();
+	int n = wave->ColumnCount();
+	int k = 0;
+	for (int i = 0; i < m - 1; ++i) {
+		for (int j = 0; j < n - 1; ++j) {
+			indices[k] = i * n + j;
+			indices[k + 1] = i * n + j + 1;
+			indices[k + 2] = (i + 1) * n + j;
 
-	//		indices[k + 3] = (i + 1) * n + j;
-	//		indices[k + 4] = i * n + j + 1;
-	//		indices[k + 5] = (i + 1) * n + j + 1;
+			indices[k + 3] = (i + 1) * n + j;
+			indices[k + 4] = i * n + j + 1;
+			indices[k + 5] = (i + 1) * n + j + 1;
 
-	//		k += 6;
-	//	}
-	//}
-	//mMeshManager->AddGeometry("wave", vertices, indices);
-	//wave->SetWavesVB(md3dDevice.Get());
+			k += 6;
+		}
+	}
+	mMeshManager->AddMesh("wave", vertices, indices);
+	wave->SetWavesVB(md3dDevice.Get());
 
-	//wave->mName = "wave";
-	//wave->mTranslation = XMFLOAT3(0.0f, -20.0f, 0.0f);
-	//wave->mMat = mMaterialManager->mMaterials["water"].get();
-	//XMStoreFloat4x4(&wave->mTexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
-	//wave->mGeo = mMeshManager->mGeometries["wave"].get();
-	//mInstanceManager->AddInstance(std::move(wave), (int)RenderLayer::Transparent);
+	wave->mGameObjectName = "wave";
+	wave->mTranslation = XMFLOAT3(0.0f, -20.0f, 0.0f);
+	wave->mMatName = "water";
+	XMStoreFloat4x4(&wave->mTexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
+	wave->mMeshName = "wave";
+	wave->mRenderLayer = (int)RenderLayer::Transparent;
+	//mGameObjectManager->AddGameObject(std::move(wave));
 
-	mMeshManager->AddGeometry("box2", geoGen.CreateBox(8.0f, 8.0f, 8.0f, 3));
+	// skull
+	{
+		std::ifstream fin("Models/skull.txt");
+
+		if (!fin) {
+			MessageBox(0, L"Models/skull.txt not found.", 0, 0);
+			return;
+		}
+
+		UINT vcount = 0;
+		UINT tcount = 0;
+		std::string ignore;
+
+		fin >> ignore >> vcount;
+		fin >> ignore >> tcount;
+		fin >> ignore >> ignore >> ignore >> ignore;
+
+		std::vector<Vertex> vertices(vcount);
+		for (UINT i = 0; i < vcount; ++i) {
+			fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;
+			fin >> vertices[i].Normal.x >> vertices[i].Normal.y >> vertices[i].Normal.z;
+
+			XMVECTOR P = XMLoadFloat3(&vertices[i].Pos);
+
+			// 将点映射至单位球，并产生球纹理坐标
+			XMFLOAT3 spherePos;
+			XMStoreFloat3(&spherePos, XMVector3Normalize(P));
+
+			float theta = atan2f(spherePos.z, spherePos.x);
+
+			// Put in [0, 2pi].
+			if (theta < 0.0f)
+				theta += XM_2PI;
+
+			float phi = acosf(spherePos.y);
+
+			float u = theta / (2.0f * XM_PI);
+			float v = phi / XM_PI;
+
+			vertices[i].TexC = { u, v };
+		}
+
+		fin >> ignore;
+		fin >> ignore;
+		fin >> ignore;
+
+		std::vector<std::uint16_t> indices(3 * tcount);
+		for (UINT i = 0; i < tcount; ++i) {
+			fin >> indices[i * 3 + 0] >> indices[i * 3 + 1] >> indices[i * 3 + 2];
+		}
+
+		fin.close();
+
+		mMeshManager->AddMesh("skull", vertices, indices);
+	}
 }
 
 void D3D12App::BuildGameObjects()
@@ -632,13 +706,14 @@ void D3D12App::BuildGameObjects()
 		mGameObjectManager->AddGameObject(std::move(rightSphere));
 	}
 
-	//auto hill = std::make_unique<Hill>();
-	//hill->mName = "hill";
-	//hill->mTranslation = XMFLOAT3(0.0f, -20.0f, 0.0f);
-	//hill->mMat = mMaterialManager->mMaterials["grass"].get();
-	//XMStoreFloat4x4(&hill->mTexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
-	//hill->mGeo = mMeshManager->mGeometries["hill"].get();
-	//mInstanceManager->AddInstance(std::move(hill), (int)RenderLayer::Opaque);
+	auto hill = std::make_unique<Hill>();
+	hill->mGameObjectName = "hill";
+	hill->mTranslation = XMFLOAT3(0.0f, -20.0f, 0.0f);
+	hill->mMatName = "grass";
+	XMStoreFloat4x4(&hill->mTexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
+	hill->mMeshName = "hill";
+	hill->mRenderLayer = (int)RenderLayer::Opaque;
+	mGameObjectManager->AddGameObject(std::move(hill));
 
 	auto box2 = std::make_unique<GameObject>();
 	box2->mGameObjectName = "box2";
@@ -647,6 +722,33 @@ void D3D12App::BuildGameObjects()
 	box2->mMeshName = "box2";
 	box2->mRenderLayer = (int)RenderLayer::AlphaTested;
 	mGameObjectManager->AddGameObject(std::move(box2));
+
+	int n = 4;
+	float width = 200.0f;
+	float height = 200.0f;
+	float depth = 200.0f;
+
+	float x = -0.5f * width;
+	float y = -0.5f * height;
+	float z = -0.5f * depth;
+	float dx = width / (n - 1);
+	float dy = height / (n - 1);
+	float dz = depth / (n - 1);
+	for (int k = 0; k < n; ++k) {
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < n; ++j) {
+				int index = k * n * n + i * n + j;
+
+				auto skull = std::make_unique<GameObject>();
+				skull->mGameObjectName = "skull" + std::to_string(index);
+				skull->mTranslation = XMFLOAT3(x + j * dx, y + i * dy, z + k * dz);
+				skull->mMatName = "wirefence";
+				skull->mMeshName = "skull";
+				skull->mRenderLayer = (int)RenderLayer::Opaque;
+				mGameObjectManager->AddGameObject(std::move(skull));
+			}
+		}
+	}
 }
 
 void D3D12App::BuildRootSignature()

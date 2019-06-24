@@ -18,9 +18,7 @@ public:
 		const std::string& matName, const XMFLOAT4X4& texTransform,
 		const std::string& meshName, const int randerLayer);
 
-	void InstanceDataChange(const std::string& gameObjectName, const std::string& meshName, const int randerLayer);
-
-	void UpdateInstanceData();
+	void UpdateInstanceData(std::shared_ptr<Camera> camera);
 
 	void Draw(ID3D12GraphicsCommandList* cmdList, int randerLayer);
 

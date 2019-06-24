@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../Common/InstanceManager.h"
+#include "../Manager/GameObjectManager.h"
 #include "../Common/FrameResource.h"
 
 class Wave :
-	public Instance
+	public GameObject
 {
 public:
 	Wave(int m, int n, float dx, float dt, float speed, float damping);

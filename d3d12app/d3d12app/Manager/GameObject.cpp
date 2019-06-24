@@ -23,8 +23,3 @@ XMFLOAT4X4 GameObject::GetWorld()
 	return mWorld;
 }
 
-void GameObject::InstanceDataChange()
-{
-	mInstanceDataChanged = true;
-}
-

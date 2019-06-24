@@ -34,7 +34,8 @@ public:
 	void AddMaterial(const std::string& name, const MaterialData& mat);
 	void DeleteMaterial(std::string name);
 
-	void MaterialDataChange(const std::string& name);
+	MaterialData GetMaterialData(const std::string& name);
+	void SetMaterialData(const std::string& name, MaterialData& mat);
 
 	void UpdateMaterialData();
 
@@ -51,7 +52,7 @@ private:
 	ID3D12Device* mDevice;
 
 	UINT mMaterialDataCapacity = 100;
-	UINT MaterialCount = 0;
+	UINT mMaterialCount = 1;
 	std::vector<std::unique_ptr<UploadBuffer<MaterialData>>> mFrameResources; // Ö¡×ÊÔ´vector
 
 	std::unordered_map<std::string, MaterialData> mMaterials;

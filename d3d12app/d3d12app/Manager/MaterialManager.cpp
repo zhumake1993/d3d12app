@@ -40,7 +40,7 @@ void MaterialManager::AddMaterial(const std::string& name, const MaterialData& m
 		return;
 	}
 
-	if (MaterialCount == mMaterialDataCapacity) {
+	if (mMaterialCount == mMaterialDataCapacity) {
 		// 应该进行扩容操作
 		// 暂时不实现
 		OutputMessageBox("Can not add new material data!");
@@ -48,10 +48,10 @@ void MaterialManager::AddMaterial(const std::string& name, const MaterialData& m
 	}
 
 	mMaterials[name] = mat;
-	mIndices[name] = MaterialCount;
+	mIndices[name] = mMaterialCount;
 	mNumFramesDirties[name] = gNumFrameResources;
 
-	++MaterialCount;
+	++mMaterialCount;
 }
 
 void MaterialManager::DeleteMaterial(std::string name)
@@ -61,7 +61,7 @@ void MaterialManager::DeleteMaterial(std::string name)
 		return;
 	}
 
-	--MaterialCount;
+	--mMaterialCount;
 
 	// 应该进行缩容操作
 	// 暂时不实现
@@ -79,8 +79,14 @@ void MaterialManager::DeleteMaterial(std::string name)
 	mNumFramesDirties.erase(name);
 }
 
-void MaterialManager::MaterialDataChange(const std::string& name)
+MaterialData MaterialManager::GetMaterialData(const std::string& name)
 {
+	return mMaterials[name];
+}
+
+void MaterialManager::SetMaterialData(const std::string& name, MaterialData& mat)
+{
+	mMaterials[name] = mat;
 	mNumFramesDirties[name] = gNumFrameResources;
 }
 

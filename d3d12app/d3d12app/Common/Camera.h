@@ -65,6 +65,12 @@ public:
 	// 修改位置和方位后重建视矩阵
 	void UpdateViewMatrix();
 
+public:
+
+	// 平截头剔除
+	DirectX::BoundingFrustum mCamFrustum;
+	bool mFrustumCullingEnabled = true;
+
 private:
 
 	// 摄像机坐标系统的世界坐标

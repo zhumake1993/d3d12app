@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../Common/d3dUtil.h"
+#include "InstanceManager.h"
+#include "MaterialManager.h"
 
 using namespace DirectX;
 
@@ -10,13 +12,12 @@ class GameObject
 
 public:
 	GameObject();
-	~GameObject();
+	virtual ~GameObject();
 
 private:
 	virtual void Update(const GameTimer& gt);
 
 	XMFLOAT4X4 GetWorld();
-	void InstanceDataChange();
 
 public:
 	std::string mGameObjectName = "GameObject";
@@ -32,6 +33,7 @@ public:
 
 	int mRenderLayer = -1;
 
-private:
-	bool mInstanceDataChanged = true;
+protected:
+	std::shared_ptr<InstanceManager> mInstanceManager;
+	std::shared_ptr<MaterialManager> mMaterialManager;
 };
