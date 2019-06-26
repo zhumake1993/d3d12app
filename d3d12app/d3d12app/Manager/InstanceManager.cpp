@@ -19,6 +19,11 @@ void InstanceManager::SetMaterialManager(std::shared_ptr<MaterialManager> materi
 	mMaterialManager = materialManager;
 }
 
+void InstanceManager::SetCamera(std::shared_ptr<Camera> camera)
+{
+	mCamera = camera;
+}
+
 void InstanceManager::AddInstance(const std::string& gameObjectName, const XMFLOAT4X4& world,
 	const std::string& matName, const XMFLOAT4X4& texTransform,
 	const std::string& meshName, const int randerLayer)
@@ -41,6 +46,7 @@ void InstanceManager::AddInstance(const std::string& gameObjectName, const XMFLO
 		instance->mMeshName = meshName;
 		instance->mMesh = mMeshManager->mMeshes[meshName];
 		instance->CalculateBoundingBox();
+		instance->mCamera = mCamera;
 
 		instance->AddInstanceData(gameObjectName, world, mMaterialManager->GetIndex(matName), texTransform);
 
@@ -48,11 +54,19 @@ void InstanceManager::AddInstance(const std::string& gameObjectName, const XMFLO
 	}
 }
 
-void InstanceManager::UpdateInstanceData(std::shared_ptr<Camera> camera)
+void InstanceManager::UpdateInstance(const std::string& gameObjectName, const XMFLOAT4X4& world, 
+	const std::string& matName, const XMFLOAT4X4& texTransform, 
+	const std::string& meshName, const int randerLayer)
+{
+	auto& instanceMap = mInstanceLayers[randerLayer];
+	instanceMap[meshName]->UpdateInstanceData(gameObjectName, world, mMaterialManager->GetIndex(matName), texTransform);
+}
+
+void InstanceManager::UploadInstanceData(std::shared_ptr<Camera> camera)
 {
 	for (auto &layer : mInstanceLayers) {
 		for (auto& p : layer) {
-			p.second->UpdateInstanceData(camera);
+			p.second->UploadInstanceData(camera);
 		}
 	}
 }
@@ -62,4 +76,47 @@ void InstanceManager::Draw(ID3D12GraphicsCommandList* cmdList, int randerLayer)
 	for (auto& p : mInstanceLayers[randerLayer]) {
 		p.second->Draw(cmdList);
 	}
+}
+
+bool InstanceManager::Pick(FXMVECTOR rayOriginW, FXMVECTOR rayDirW)
+{
+	bool result = false;
+
+	std::string nameResult;
+	float tminResult = MathHelper::Infinity;
+	XMVECTOR pointResult;
+
+	for (int i = 0; i < (int)RenderLayer::Count;i++) {
+
+		// ÅÅ³ýÌì¿ÕÇò
+		if (i == (int)RenderLayer::Sky)
+			continue;
+
+		for (auto& p : mInstanceLayers[i]) {
+
+			std::string name;
+			float tmin;
+			XMVECTOR point;
+
+			if (p.second->Pick(rayOriginW, rayDirW, name, tmin, point)) {
+				if (tmin < tminResult) {
+					result = true;
+
+					nameResult = name;
+					tminResult = tmin;
+					pointResult = point;
+				}
+			}
+		}
+	}
+
+	if (result) {
+		XMFLOAT3 pp;
+		XMStoreFloat3(&pp, pointResult);
+		OutputDebug(nameResult);
+		OutputDebug(std::to_string(tminResult));
+		OutputDebug(std::to_string(pp.x) + ',' + std::to_string(pp.y) + ',' + std::to_string(pp.z));
+	}
+
+	return result;
 }

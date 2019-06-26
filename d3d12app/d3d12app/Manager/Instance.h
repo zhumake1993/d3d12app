@@ -3,6 +3,7 @@
 #include "../Common/d3dUtil.h"
 #include "../Common/Camera.h"
 #include "../Common/UploadBuffer.h"
+#include "MaterialManager.h"
 #include "MeshManager.h"
 
 using namespace DirectX;
@@ -33,9 +34,14 @@ public:
 	void AddInstanceData(const std::string& gameObjectName, const XMFLOAT4X4& world,
 		const UINT& matIndex, const XMFLOAT4X4& texTransform);
 
-	void UpdateInstanceData(std::shared_ptr<Camera> camera);
+	void UpdateInstanceData(const std::string& gameObjectName, const XMFLOAT4X4& world,
+		const UINT& matIndex, const XMFLOAT4X4& texTransform);
+
+	void UploadInstanceData(std::shared_ptr<Camera> camera);
 
 	void Draw(ID3D12GraphicsCommandList* cmdList);
+
+	bool Pick(FXMVECTOR rayOriginW, FXMVECTOR rayDirW, std::string& name, float& tmin, XMVECTOR& point);
 
 private:
 	//
@@ -58,4 +64,8 @@ private:
 	BoundingBox mBounds;
 
 	std::unordered_map<std::string, InstanceData> mInstances;
+
+private:
+
+	std::shared_ptr<Camera> mCamera;
 };

@@ -31,6 +31,7 @@ enum class RenderLayer : int
 	Transparent,
 	AlphaTested,
 	Sky,
+	OpaqueDynamicReflectors,
 	UI,
 
 	Count

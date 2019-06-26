@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Common/d3dUtil.h"
+#include "../Common/Camera.h"
 #include "InstanceManager.h"
 #include "MaterialManager.h"
 

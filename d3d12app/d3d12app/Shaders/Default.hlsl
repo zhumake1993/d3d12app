@@ -76,11 +76,11 @@ float4 PS(VertexOut pin) : SV_Target
 	// 插值法向量会造成非单位法向量，因此需要规整
 	pin.NormalW = normalize(pin.NormalW);
 
-	float4 normalMapSample = gTextureMaps[normalMapIndex].Sample(gsamAnisotropicWrap, pin.TexC);
-	float3 bumpedNormalW = NormalSampleToWorldSpace(normalMapSample.rgb, pin.NormalW, pin.TangentW);
+	//float4 normalMapSample = gTextureMaps[normalMapIndex].Sample(gsamAnisotropicWrap, pin.TexC);
+	//float3 bumpedNormalW = NormalSampleToWorldSpace(normalMapSample.rgb, pin.NormalW, pin.TangentW);
 
 	// 取消注释以关闭法向量贴图映射
-	bumpedNormalW = pin.NormalW;
+	float3 bumpedNormalW = pin.NormalW;
 
 	float3 toEyeW = gEyePosW - pin.PosW;
 	float distToEye = length(toEyeW);
@@ -89,7 +89,8 @@ float4 PS(VertexOut pin) : SV_Target
 	// 环境光
     float4 ambient = gAmbientLight* diffuseAlbedo;
 
-    const float shininess = (1.0f - roughness) * normalMapSample.a;
+    //const float shininess = (1.0f - roughness) * normalMapSample.a;
+	const float shininess = (1.0f - roughness);
     Material mat = { diffuseAlbedo, fresnelR0, shininess };
     float3 shadowFactor = 1.0f;
     float4 directLight = ComputeLighting(gLights, mat, pin.PosW,
@@ -98,11 +99,12 @@ float4 PS(VertexOut pin) : SV_Target
     float4 litColor = ambient + directLight;
 
 	// 镜面反射
-	//float3 r = reflect(-toEyeW, bumpedNormalW);
-	////r = BoxCubeMapLookup(pin.PosW, normalize(r), float3(0.0f, 0.0f, 0.0f), float3(2500.0f, 2500.0f, 2500.0f));
-	//float4 reflectionColor = gCubeMap.Sample(gsamLinearWrap, r);
-	//float3 fresnelFactor = SchlickFresnel(fresnelR0, bumpedNormalW, r);
-	//litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
+	float3 r = reflect(-toEyeW, bumpedNormalW);
+	r = BoxCubeMapLookup(pin.PosW, normalize(r), float3(0.0f, 0.0f, 0.0f), float3(2500.0f, 2500.0f, 2500.0f));
+	r = normalize(r); // 单位化
+	float4 reflectionColor = gCubeMap.Sample(gsamLinearWrap, r);
+	float3 fresnelFactor = SchlickFresnel(fresnelR0, bumpedNormalW, r);
+	litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
 
 #ifdef FOG
 	// 计算雾

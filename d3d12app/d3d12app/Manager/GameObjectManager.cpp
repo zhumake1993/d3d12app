@@ -38,5 +38,8 @@ void GameObjectManager::Update(const GameTimer& gt)
 {
 	for (auto &p : mGameObjects) {
 		p.second->Update(gt);
+
+		mInstanceManager->UpdateInstance(p.second->mGameObjectName, p.second->GetWorld(),
+			p.second->mMatName, p.second->mTexTransform, p.second->mMeshName, p.second->mRenderLayer);
 	}
 }

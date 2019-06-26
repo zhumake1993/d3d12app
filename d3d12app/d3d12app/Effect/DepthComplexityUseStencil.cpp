@@ -26,6 +26,7 @@ void DepthComplexityUseStencil::Draw(std::shared_ptr<InstanceManager> instanceMa
 	// 计算深度复杂度
 	mCmdList->SetPipelineState(mCountDepthComplexityUseStencilPSO.Get());
 	instanceManager->Draw(mCmdList, (int)RenderLayer::Opaque);
+	instanceManager->Draw(mCmdList, (int)RenderLayer::OpaqueDynamicReflectors);
 	instanceManager->Draw(mCmdList, (int)RenderLayer::AlphaTested);
 	instanceManager->Draw(mCmdList, (int)RenderLayer::Transparent);
 

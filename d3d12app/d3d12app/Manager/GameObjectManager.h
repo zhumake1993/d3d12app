@@ -1,8 +1,5 @@
 #pragma once
 
-#include "../Common/d3dUtil.h"
-#include "InstanceManager.h"
-#include "MaterialManager.h"
 #include "GameObject.h"
 
 using namespace DirectX;

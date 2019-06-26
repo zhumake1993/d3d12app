@@ -101,8 +101,8 @@ void D3D12App::Update(const GameTimer& gt)
 	}
 
 	mMaterialManager->UpdateMaterialData();
-	mInstanceManager->UpdateInstanceData(mCamera);
 	mGameObjectManager->Update(gt);
+	mInstanceManager->UploadInstanceData(mCamera);
 	UpdateFrameResource(gt);
 }
 
@@ -117,7 +117,6 @@ void D3D12App::Draw(const GameTimer& gt)
 
 	//重置指令列表以重用内存
 	//必须在使用ExecuteCommandList将指令列表添加进指令队列后才能执行该操作
-	//ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque"].Get()));
 	ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque"].Get()));
 
 	//设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
@@ -138,11 +137,14 @@ void D3D12App::Draw(const GameTimer& gt)
 	// 主绘制
 	//
 
+	// 绑定描述符堆
 	ID3D12DescriptorHeap* descriptorHeaps[] = { mTextureManager->GetSrvDescriptorHeapPtr() };
 	mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
+	// 设置根签名
 	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
+	// 绑定常量缓冲
 	auto passCB = mPassCB->GetCurrResource()->Resource();
 	mCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 
@@ -166,6 +168,45 @@ void D3D12App::Draw(const GameTimer& gt)
 		mDepthComplexityUseBlend->Draw(mInstanceManager);
 	}
 	else {
+		// 绘制动态立方体贴图时要关闭平截头剔除
+		mCamera->mFrustumCullingEnabled = false;
+
+		mCubeMap->DrawSceneToCubeMap(mInstanceManager, mPSOs);
+
+		//设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
+		mCommandList->RSSetViewports(1, &mScreenViewport);
+		mCommandList->RSSetScissorRects(1, &mScissorRect);
+
+		//清空后背缓冲和深度模板缓冲
+		mCommandList->ClearRenderTargetView(mRenderTarget->Rtv(), DirectX::Colors::LightSteelBlue, 0, nullptr);
+		mCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+
+		//设置渲染目标
+		mCommandList->OMSetRenderTargets(1, &mRenderTarget->Rtv(), true, &DepthStencilView());
+
+		// 绑定常量缓冲
+		auto passCB = mPassCB->GetCurrResource()->Resource();
+		mCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
+
+		// 使用动态立方体贴图绘制动态反射物体
+
+		// 绑定动态立方体贴图的描述符堆
+		ID3D12DescriptorHeap* descriptorHeapsCube[] = { mCubeMap->GetSrvDescriptorHeapPtr() };
+		mCommandList->SetDescriptorHeaps(_countof(descriptorHeapsCube), descriptorHeapsCube);
+
+		mCommandList->SetGraphicsRootDescriptorTable(3, mCubeMap->Srv());
+
+		mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::OpaqueDynamicReflectors);
+
+		// 使用静态立方体贴图绘制动态其他物体
+
+		// 绑定纹理的描述符堆
+		ID3D12DescriptorHeap* descriptorHeapsTex[] = { mTextureManager->GetSrvDescriptorHeapPtr() };
+		mCommandList->SetDescriptorHeaps(_countof(descriptorHeapsTex), descriptorHeapsTex);
+
+		mCommandList->SetGraphicsRootDescriptorTable(3, mTextureManager->GetGpuSrvCube());
+
 		mCommandList->SetPipelineState(mPSOs["opaque"].Get());
 		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Opaque);
 
@@ -231,10 +272,14 @@ void D3D12App::Draw(const GameTimer& gt)
 
 void D3D12App::OnMouseDown(WPARAM btnState, int x, int y)
 {
-	mLastMousePos.x = x;
-	mLastMousePos.y = y;
+	if ((btnState & MK_RBUTTON) != 0) {
+		mLastMousePos.x = x;
+		mLastMousePos.y = y;
 
-	SetCapture(mhMainWnd);
+		SetCapture(mhMainWnd);
+	} else if ((btnState & MK_LBUTTON) != 0) {
+		Pick(x, y);
+	}
 }
 
 void D3D12App::OnMouseUp(WPARAM btnState, int x, int y)
@@ -244,7 +289,7 @@ void D3D12App::OnMouseUp(WPARAM btnState, int x, int y)
 
 void D3D12App::OnMouseMove(WPARAM btnState, int x, int y)
 {
-	if ((btnState & MK_LBUTTON) != 0) {
+	if ((btnState & MK_RBUTTON) != 0) {
 		// 每像素对应0.25度
 		float dx = XMConvertToRadians(0.25f * static_cast<float>(x - mLastMousePos.x));
 		float dy = XMConvertToRadians(0.25f * static_cast<float>(y - mLastMousePos.y));
@@ -351,6 +396,8 @@ void D3D12App::UpdateFrameResource(const GameTimer& gt)
 	mainPassCB.Lights[2].Strength = { 0.2f, 0.2f, 0.2f };
 
 	mPassCB->Copy(0, mainPassCB);
+
+	mCubeMap->UpdatePassConstantsData(mainPassCB);
 }
 
 void D3D12App::BuildManagers()
@@ -364,6 +411,7 @@ void D3D12App::BuildManagers()
 	mInstanceManager = std::make_shared<InstanceManager>(md3dDevice.Get());
 	mInstanceManager->SetMeshManager(mMeshManager);
 	mInstanceManager->SetMaterialManager(mMaterialManager);
+	mInstanceManager->SetCamera(mCamera);
 
 	mGameObjectManager = std::make_shared<GameObjectManager>();
 	mGameObjectManager->SetInstanceManager(mInstanceManager);
@@ -398,6 +446,11 @@ void D3D12App::BuildEffects()
 
 	mMultiplyFilter = std::make_unique<MultiplyFilter>(md3dDevice.Get(), mCommandList.Get(),
 		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
+
+	mCubeMap = std::make_unique<CubeMap>(md3dDevice.Get(), mCommandList.Get(),
+		DXGI_FORMAT_R8G8B8A8_UNORM, mDepthStencilFormat,
+		mCbvSrvUavDescriptorSize, mRtvDescriptorSize, mDsvDescriptorSize);
+	mCubeMap->BuildCubeFaceCamera(0.0f, 2.0f, 0.0f);
 }
 
 void D3D12App::BuildTextures()
@@ -436,7 +489,7 @@ void D3D12App::BuildMaterials()
 	bricks.NormalMapIndex = mTextureManager->GetIndex("default_nmap");
 	bricks.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	bricks.FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
-	bricks.Roughness = 0.1f;
+	bricks.Roughness = 0.3f;
 	mMaterialManager->AddMaterial("bricks", bricks);
 
 	MaterialData bricks2;
@@ -510,6 +563,14 @@ void D3D12App::BuildMaterials()
 	ice.FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	ice.Roughness = 0.0f;
 	mMaterialManager->AddMaterial("ice", ice);
+
+	MaterialData skullMat;
+	skullMat.DiffuseMapIndex = mTextureManager->GetIndex("white1x1");
+	skullMat.NormalMapIndex = -1;
+	skullMat.DiffuseAlbedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
+	skullMat.FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
+	skullMat.Roughness = 0.2f;
+	mMaterialManager->AddMaterial("skullMat", skullMat);
 }
 
 void D3D12App::BuildMeshes()
@@ -642,23 +703,10 @@ void D3D12App::BuildGameObjects()
 	sky->mRenderLayer = (int)RenderLayer::Sky;
 	mGameObjectManager->AddGameObject(std::move(sky));
 
-	auto box = std::make_unique<GameObject>();
-	box->mGameObjectName = "box";
-	box->mTranslation = XMFLOAT3(0.0f, 0.5f, 0.0f);
-	box->mScale = XMFLOAT3(2.0f, 1.0f, 2.0f);
-	box->mMatName = "bricks2";
-	XMStoreFloat4x4(&box->mTexTransform, XMMatrixScaling(1.0f, 0.5f, 1.0f));
-	box->mMeshName = "box";
-	box->mRenderLayer = (int)RenderLayer::Opaque;
+	auto box = std::make_unique<Box>();
 	mGameObjectManager->AddGameObject(std::move(box));
 
-	auto globe = std::make_unique<GameObject>();
-	globe->mGameObjectName = "globe";
-	globe->mTranslation = XMFLOAT3(0.0f, 2.0f, 0.0f);
-	globe->mScale = XMFLOAT3(2.0f, 2.0f, 2.0f);
-	globe->mMatName = "mirror";
-	globe->mMeshName = "sphere";
-	globe->mRenderLayer = (int)RenderLayer::Opaque;
+	auto globe = std::make_unique<Globe>();
 	mGameObjectManager->AddGameObject(std::move(globe));
 
 	auto grid = std::make_unique<GameObject>();
@@ -692,7 +740,7 @@ void D3D12App::BuildGameObjects()
 		auto leftSphere = std::make_unique<GameObject>();
 		leftSphere->mGameObjectName = "leftSphere" + std::to_string(i);
 		leftSphere->mTranslation = XMFLOAT3(-5.0f, 3.5f, -10.0f + i * 5.0f);
-		leftSphere->mMatName = "stone";
+		leftSphere->mMatName = "mirror";
 		leftSphere->mMeshName = "sphere";
 		leftSphere->mRenderLayer = (int)RenderLayer::Opaque;
 		mGameObjectManager->AddGameObject(std::move(leftSphere));
@@ -700,7 +748,7 @@ void D3D12App::BuildGameObjects()
 		auto rightSphere = std::make_unique<GameObject>();
 		rightSphere->mGameObjectName = "rightSphere" + std::to_string(i);
 		rightSphere->mTranslation = XMFLOAT3(+5.0f, 3.5f, -10.0f + i * 5.0f);
-		rightSphere->mMatName = "stone";
+		rightSphere->mMatName = "mirror";
 		rightSphere->mMeshName = "sphere";
 		rightSphere->mRenderLayer = (int)RenderLayer::Opaque;
 		mGameObjectManager->AddGameObject(std::move(rightSphere));
@@ -723,32 +771,12 @@ void D3D12App::BuildGameObjects()
 	box2->mRenderLayer = (int)RenderLayer::AlphaTested;
 	mGameObjectManager->AddGameObject(std::move(box2));
 
-	int n = 4;
-	float width = 200.0f;
-	float height = 200.0f;
-	float depth = 200.0f;
-
-	float x = -0.5f * width;
-	float y = -0.5f * height;
-	float z = -0.5f * depth;
-	float dx = width / (n - 1);
-	float dy = height / (n - 1);
-	float dz = depth / (n - 1);
-	for (int k = 0; k < n; ++k) {
-		for (int i = 0; i < n; ++i) {
-			for (int j = 0; j < n; ++j) {
-				int index = k * n * n + i * n + j;
-
-				auto skull = std::make_unique<GameObject>();
-				skull->mGameObjectName = "skull" + std::to_string(index);
-				skull->mTranslation = XMFLOAT3(x + j * dx, y + i * dy, z + k * dz);
-				skull->mMatName = "wirefence";
-				skull->mMeshName = "skull";
-				skull->mRenderLayer = (int)RenderLayer::Opaque;
-				mGameObjectManager->AddGameObject(std::move(skull));
-			}
-		}
-	}
+	auto skull = std::make_unique<Skull>();
+	skull->mGameObjectName = "skull";
+	skull->mMatName = "skullMat";
+	skull->mMeshName = "skull";
+	skull->mRenderLayer = (int)RenderLayer::Opaque;
+	mGameObjectManager->AddGameObject(std::move(skull));
 }
 
 void D3D12App::BuildRootSignature()
@@ -764,7 +792,7 @@ void D3D12App::BuildRootSignature()
 	slotRootParameter[0].InitAsShaderResourceView(0, 1); // 结构化缓冲InstanceData
 	slotRootParameter[1].InitAsConstantBufferView(1); // 常量缓冲PassConstants
 	slotRootParameter[2].InitAsShaderResourceView(1, 1); // 结构化缓冲MaterialData
-	slotRootParameter[3].InitAsDescriptorTable(1, &texCubeMap, D3D12_SHADER_VISIBILITY_PIXEL); // 天空球
+	slotRootParameter[3].InitAsDescriptorTable(1, &texCubeMap, D3D12_SHADER_VISIBILITY_PIXEL); // 立方体贴图
 	slotRootParameter[4].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL); // 纹理
 
 	auto staticSamplers = d3dUtil::GetStaticSamplers();
@@ -922,4 +950,26 @@ void D3D12App::BuildPSOs()
 		mShaders["skyPS"]->GetBufferSize()
 	};
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&skyPsoDesc, IID_PPV_ARGS(&mPSOs["sky"])));
+}
+
+void D3D12App::Pick(int sx, int sy)
+{
+	XMFLOAT4X4 P = mCamera->GetProj4x4f();
+
+	// 计算视空间的选取射线
+	float vx = (+2.0f * sx / mClientWidth - 1.0f) / P(0, 0);
+	float vy = (-2.0f * sy / mClientHeight + 1.0f) / P(1, 1);
+
+	// 视空间的射线定义
+	XMVECTOR rayOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+	XMVECTOR rayDir = XMVectorSet(vx, vy, 1.0f, 0.0f);
+
+	// 将射线转换至世界空间
+	XMMATRIX V = mCamera->GetView();
+	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(V), V);
+
+	XMVECTOR rayOriginW = XMVector3TransformCoord(rayOrigin, invView);
+	XMVECTOR rayDirW = XMVector3TransformNormal(rayDir, invView);
+
+	mInstanceManager->Pick(rayOriginW, rayDirW);
 }

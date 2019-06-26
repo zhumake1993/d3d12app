@@ -12,6 +12,7 @@
 #include "Manager/TextureManager.h"
 #include "Manager/MaterialManager.h"
 #include "Manager/MeshManager.h"
+#include "Manager/InputManager.h"
 
 #include "Effect/RenderTarget.h"
 #include "Effect/ShaderResource.h"
@@ -23,12 +24,20 @@
 #include "Effect/SobelFilter.h"
 #include "Effect/InverseFilter.h"
 #include "Effect/MultiplyFilter.h"
+#include "Effect/CubeMap.h"
 
+#include "GameObject/Box.h"
 #include "GameObject/Hill.h"
 #include "GameObject/Wave.h"
+#include "GameObject/Skull.h"
+#include "GameObject/Globe.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
+
+struct CommonResource {
+
+};
 
 class D3D12App : public D3DApp
 {
@@ -69,12 +78,17 @@ private:
 	void BuildShadersAndInputLayout();
 	void BuildPSOs();
 
+	void Pick(int sx, int sy);
+
 private:
 	std::shared_ptr<TextureManager> mTextureManager;
 	std::shared_ptr<MaterialManager> mMaterialManager;
 	std::shared_ptr<MeshManager> mMeshManager;
 	std::shared_ptr<InstanceManager> mInstanceManager;
 	std::shared_ptr<GameObjectManager> mGameObjectManager;
+
+	std::shared_ptr<Camera> mCamera;
+	POINT mLastMousePos;
 
 	ComPtr<ID3D12RootSignature> mRootSignature = nullptr; // 根签名
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders; // 着色器
@@ -83,10 +97,6 @@ private:
 
 	std::unique_ptr<MainFrameResource> mMainFrameResource; // Main帧资源
 	std::unique_ptr<FrameResource<PassConstants>> mPassCB; // passCB帧资源
-
-	std::shared_ptr<Camera> mCamera;
-
-	POINT mLastMousePos;
 
 	std::unique_ptr<RenderTarget> mRenderTarget = nullptr;
 
@@ -111,5 +121,7 @@ private:
 
 	std::unique_ptr<InverseFilter> mInverseFilter;
 	std::unique_ptr<MultiplyFilter> mMultiplyFilter;
+
+	std::unique_ptr<CubeMap> mCubeMap;
 };
 

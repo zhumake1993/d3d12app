@@ -17,6 +17,7 @@ void Wireframe::Draw(std::shared_ptr<InstanceManager> instanceManager)
 {
 	mCmdList->SetPipelineState(mWireframePSO.Get());
 	instanceManager->Draw(mCmdList, (int)RenderLayer::Opaque);
+	instanceManager->Draw(mCmdList, (int)RenderLayer::OpaqueDynamicReflectors);
 	instanceManager->Draw(mCmdList, (int)RenderLayer::AlphaTested);
 	instanceManager->Draw(mCmdList, (int)RenderLayer::Transparent);
 }

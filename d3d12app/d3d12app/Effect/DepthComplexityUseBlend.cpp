@@ -20,6 +20,7 @@ void DepthComplexityUseBlend::Draw(std::shared_ptr<InstanceManager> instanceMana
 {
 	mCmdList->SetPipelineState(mShowDepthComplexityUseBlendPSO.Get());
 	instanceManager->Draw(mCmdList, (int)RenderLayer::Opaque);
+	instanceManager->Draw(mCmdList, (int)RenderLayer::OpaqueDynamicReflectors);
 	instanceManager->Draw(mCmdList, (int)RenderLayer::AlphaTested);
 	instanceManager->Draw(mCmdList, (int)RenderLayer::Transparent);
 }
