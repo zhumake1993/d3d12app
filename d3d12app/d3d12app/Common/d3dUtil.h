@@ -25,6 +25,18 @@
 const int gNumFrameResources = 3;
 extern int gCurrFrameResourceIndex; // 当前帧资源索引
 
+enum class RenderLayer : int
+{
+	Opaque = 0,
+	Transparent,
+	AlphaTested,
+	Sky,
+	OpaqueDynamicReflectors,
+	UI,
+
+	Count
+};
+
 class d3dUtil
 {
 public:

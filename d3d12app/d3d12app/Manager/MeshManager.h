@@ -1,7 +1,8 @@
 #pragma once
 
-#include "d3dUtil.h"
-#include "GeometryGenerator.h"
+#include "../Common/d3dUtil.h"
+#include "../Common/GeometryGenerator.h"
+#include "Manager.h"
 
 struct Mesh
 {
@@ -26,23 +27,24 @@ struct Mesh
 	D3D12_VERTEX_BUFFER_VIEW VertexBufferView;
 	D3D12_INDEX_BUFFER_VIEW IndexBufferView;
 
-	DirectX::BoundingBox Bounds;
+	D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 };
 
-class MeshManager
+class MeshManager :
+	public Manager
 {
 public:
 	MeshManager(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
 	~MeshManager();
 
-	void AddGeometry(std::string Name,  GeometryGenerator::MeshData mesh);
-	void AddGeometry(std::string Name, std::vector<Vertex> &vertices, std::vector<std::uint16_t> &indices);
-	void DeleteGeometry(std::string Name);
+	void AddMesh(std::string Name,  GeometryGenerator::MeshData mesh);
+	void AddMesh(std::string Name, std::vector<Vertex> &vertices, std::vector<std::uint16_t> &indices);
+	void DeleteMesh(std::string Name);
 
 private:
 
 public:
-	std::unordered_map<std::string, std::unique_ptr<Mesh>> mGeometries;
+	std::unordered_map<std::string, std::shared_ptr<Mesh>> mMeshes;
 
 private:
 	ID3D12Device* mDevice;

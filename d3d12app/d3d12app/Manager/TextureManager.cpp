@@ -11,6 +11,26 @@ TextureManager::~TextureManager()
 {
 }
 
+UINT TextureManager::GetIndex(std::string name)
+{
+	return mTextures[name]->Index;
+}
+
+UINT TextureManager::GetCubeIndex()
+{
+	return mCubeMap->Index;
+}
+
+ID3D12DescriptorHeap* TextureManager::GetSrvDescriptorHeapPtr()
+{
+	return mSrvDescriptorHeap.Get();
+}
+
+UINT TextureManager::GetMaxNumTextures()
+{
+	return mMaxNumTextures;
+}
+
 void TextureManager::AddTextureTex(std::wstring FileName)
 {
 	auto tex = std::make_unique<Texture>();
@@ -18,7 +38,8 @@ void TextureManager::AddTextureTex(std::wstring FileName)
 
 	CreateTexture(tex);
 
-	mTextures[tex->Name] = std::move(tex);
+	if(tex->Name != "")
+		mTextures[tex->Name] = std::move(tex);
 }
 
 void TextureManager::AddTextureCube(std::wstring FileName)
@@ -28,7 +49,8 @@ void TextureManager::AddTextureCube(std::wstring FileName)
 
 	CreateTexture(tex);
 
-	mCubeMap = std::move(tex);
+	if (tex->Name != "")
+		mCubeMap = std::move(tex);
 }
 
 void TextureManager::BuildDescriptorHeaps()
@@ -91,6 +113,8 @@ void TextureManager::CreateTexture(std::unique_ptr<Texture> &tex)
 	tex->Name = fileNameString.substr(begin + 1, end - begin - 1);
 
 	if (mTextures.find(tex->Name) != mTextures.end()) {
+		OutputMessageBox("Texture already exists!");
+		tex->Name = "";
 		return;
 	}
 

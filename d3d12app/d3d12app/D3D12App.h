@@ -6,10 +6,14 @@
 #include "Common/FrameResource.h"
 #include "Common/GeometryGenerator.h"
 #include "Common/Camera.h"
-#include "Common/TextureManager.h"
-#include "Common/MaterialManager.h"
-#include "Common/MeshManager.h"
-#include "Common/InstanceManager.h"
+
+#include "Manager/Manager.h"
+#include "Manager/GameObjectManager.h"
+#include "Manager/InstanceManager.h"
+#include "Manager/TextureManager.h"
+#include "Manager/MaterialManager.h"
+#include "Manager/MeshManager.h"
+#include "Manager/InputManager.h"
 
 #include "Effect/RenderTarget.h"
 #include "Effect/ShaderResource.h"
@@ -21,9 +25,18 @@
 #include "Effect/SobelFilter.h"
 #include "Effect/InverseFilter.h"
 #include "Effect/MultiplyFilter.h"
+#include "Effect/CubeMap.h"
 
+#include "GameObject/Sky.h"
+#include "GameObject/Box.h"
+#include "GameObject/WirefenceBox.h"
 #include "GameObject/Hill.h"
 #include "GameObject/Wave.h"
+#include "GameObject/Skull.h"
+#include "GameObject/Globe.h"
+#include "GameObject/Grid.h"
+#include "GameObject/Cylinder.h"
+#include "GameObject/Sphere.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -56,20 +69,32 @@ private:
 
 	void UpdateFrameResource(const GameTimer& gt);
 
+	void BuildManagers();
+	void BuildEffects();
 	void BuildTextures();
 	void BuildMaterials();
 	void BuildMeshes();
-	void BuildInstances();
+	void BuildGameObjects();
 
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
 	void BuildPSOs();
 
+	void Pick(int sx, int sy);
+
 private:
-	std::unique_ptr<TextureManager> mTextureManager;
-	std::unique_ptr<MaterialManager> mMaterialManager;
-	std::unique_ptr<MeshManager> mMeshManager;
-	std::unique_ptr<InstanceManager> mInstanceManager;
+
+	std::shared_ptr<CommonResource> mCommonResource;
+
+	std::shared_ptr<TextureManager> mTextureManager;
+	std::shared_ptr<MaterialManager> mMaterialManager;
+	std::shared_ptr<MeshManager> mMeshManager;
+	std::shared_ptr<InstanceManager> mInstanceManager;
+	std::shared_ptr<GameObjectManager> mGameObjectManager;
+	std::shared_ptr<InputManager> mInputManager;
+
+	std::shared_ptr<Camera> mCamera;
+	POINT mLastMousePos;
 
 	ComPtr<ID3D12RootSignature> mRootSignature = nullptr; // 根签名
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders; // 着色器
@@ -78,10 +103,6 @@ private:
 
 	std::unique_ptr<MainFrameResource> mMainFrameResource; // Main帧资源
 	std::unique_ptr<FrameResource<PassConstants>> mPassCB; // passCB帧资源
-
-	Camera mCamera;
-
-	POINT mLastMousePos;
 
 	std::unique_ptr<RenderTarget> mRenderTarget = nullptr;
 
@@ -106,5 +127,7 @@ private:
 
 	std::unique_ptr<InverseFilter> mInverseFilter;
 	std::unique_ptr<MultiplyFilter> mMultiplyFilter;
+
+	std::unique_ptr<CubeMap> mCubeMap;
 };
 

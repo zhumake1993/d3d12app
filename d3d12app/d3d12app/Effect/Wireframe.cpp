@@ -13,10 +13,11 @@ void Wireframe::SetPSODesc(D3D12_GRAPHICS_PIPELINE_STATE_DESC& opaquePsoDesc)
 	BuildPSOs();
 }
 
-void Wireframe::Draw(std::unique_ptr<InstanceManager>& instanceManager)
+void Wireframe::Draw(std::shared_ptr<InstanceManager> instanceManager)
 {
 	mCmdList->SetPipelineState(mWireframePSO.Get());
 	instanceManager->Draw(mCmdList, (int)RenderLayer::Opaque);
+	instanceManager->Draw(mCmdList, (int)RenderLayer::OpaqueDynamicReflectors);
 	instanceManager->Draw(mCmdList, (int)RenderLayer::AlphaTested);
 	instanceManager->Draw(mCmdList, (int)RenderLayer::Transparent);
 }

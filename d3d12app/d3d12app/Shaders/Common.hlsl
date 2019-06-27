@@ -15,6 +15,17 @@
 
 #define gMaxNumTextures 100
 
+struct InstanceData
+{
+	float4x4 World;
+	float4x4 InvTraWorld;
+	float4x4 TexTransform;
+	uint     MaterialIndex;
+	uint     InstPad0;
+	uint     InstPad1;
+	uint     InstPad2;
+};
+
 struct MaterialData
 {
 	float4   DiffuseAlbedo;
@@ -31,7 +42,8 @@ TextureCube gCubeMap : register(t0);
 
 Texture2D gTextureMaps[gMaxNumTextures] : register(t1);
 
-StructuredBuffer<MaterialData> gMaterialData : register(t0, space1);
+StructuredBuffer<InstanceData> gInstanceData : register(t0, space1);
+StructuredBuffer<MaterialData> gMaterialData : register(t1, space1);
 
 
 SamplerState gsamPointWrap        : register(s0);
@@ -40,17 +52,6 @@ SamplerState gsamLinearWrap       : register(s2);
 SamplerState gsamLinearClamp      : register(s3);
 SamplerState gsamAnisotropicWrap  : register(s4);
 SamplerState gsamAnisotropicClamp : register(s5);
-
-cbuffer cbPerObject : register(b0)
-{
-    float4x4 gWorld;
-	float4x4 gInvTraWorld;
-	float4x4 gTexTransform;
-	uint gMaterialIndex;
-	uint gObjPad0;
-	uint gObjPad1;
-	uint gObjPad2;
-};
 
 cbuffer cbPass : register(b1)
 {

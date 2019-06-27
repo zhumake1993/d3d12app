@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../Common/d3dUtil.h"
-#include "../Common/InstanceManager.h"
+#include "../Manager/InstanceManager.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -17,7 +17,7 @@ public:
 
 	void SetPSODesc(D3D12_GRAPHICS_PIPELINE_STATE_DESC& opaquePsoDesc);
 
-	void Draw(std::unique_ptr<InstanceManager>& instanceManager);
+	void Draw(std::shared_ptr<InstanceManager> instanceManager);
 
 private:
 	void BuildPSOs();

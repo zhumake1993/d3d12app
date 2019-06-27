@@ -21,11 +21,12 @@ void DepthComplexityUseStencil::SetPSODesc(D3D12_GRAPHICS_PIPELINE_STATE_DESC& o
 	BuildPSOs();
 }
 
-void DepthComplexityUseStencil::Draw(std::unique_ptr<InstanceManager>& instanceManager)
+void DepthComplexityUseStencil::Draw(std::shared_ptr<InstanceManager> instanceManager)
 {
 	// 计算深度复杂度
 	mCmdList->SetPipelineState(mCountDepthComplexityUseStencilPSO.Get());
 	instanceManager->Draw(mCmdList, (int)RenderLayer::Opaque);
+	instanceManager->Draw(mCmdList, (int)RenderLayer::OpaqueDynamicReflectors);
 	instanceManager->Draw(mCmdList, (int)RenderLayer::AlphaTested);
 	instanceManager->Draw(mCmdList, (int)RenderLayer::Transparent);
 

@@ -8,13 +8,13 @@ MeshManager::MeshManager(ID3D12Device* device, ID3D12GraphicsCommandList* cmdLis
 
 MeshManager::~MeshManager()
 {
-	for (const auto& p : mGeometries) {
+	for (const auto& p : mMeshes) {
 		p.second->VertexBufferUploader = nullptr;
 		p.second->IndexBufferUploader = nullptr;
 	}
 }
 
-void MeshManager::AddGeometry(std::string Name, GeometryGenerator::MeshData mesh)
+void MeshManager::AddMesh(std::string Name, GeometryGenerator::MeshData mesh)
 {
 	// 注意：Vertex与GeometryGenerator::Vertex是不一样的
 	// 必须将mesh中的顶点向量和索引向量重新复制一份
@@ -29,12 +29,17 @@ void MeshManager::AddGeometry(std::string Name, GeometryGenerator::MeshData mesh
 	std::vector<std::uint16_t> indices;
 	indices.insert(indices.end(), std::begin(mesh.GetIndices16()), std::end(mesh.GetIndices16()));
 
-	AddGeometry(Name, vertices, indices);
+	AddMesh(Name, vertices, indices);
 }
 
-void MeshManager::AddGeometry(std::string Name, std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices)
+void MeshManager::AddMesh(std::string Name, std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices)
 {
-	auto meshGeo = std::make_unique<Mesh>();
+	if (mMeshes.find(Name) != mMeshes.end()) {
+		OutputMessageBox("Mesh already exists!");
+		return;
+	}
+
+	auto meshGeo = std::make_shared<Mesh>();
 	meshGeo->Name = Name;
 
 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
@@ -66,9 +71,9 @@ void MeshManager::AddGeometry(std::string Name, std::vector<Vertex>& vertices, s
 	meshGeo->IndexBufferView.Format = meshGeo->IndexFormat;
 	meshGeo->IndexBufferView.SizeInBytes = meshGeo->IndexBufferByteSize;
 
-	mGeometries[Name] = std::move(meshGeo);
+	mMeshes[Name] = meshGeo;
 }
 
-void MeshManager::DeleteGeometry(std::string Name)
+void MeshManager::DeleteMesh(std::string Name)
 {
 }

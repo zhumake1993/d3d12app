@@ -1,12 +1,12 @@
 #pragma once
 
-#include "../Common/InstanceManager.h"
+#include "../Manager/GameObjectManager.h"
 
 class Hill :
-	public Instance
+	public GameObject
 {
 public:
-	Hill();
+	Hill(std::shared_ptr<CommonResource> commonResource);
 	~Hill();
 
 private:

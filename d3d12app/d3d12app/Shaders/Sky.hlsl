@@ -13,13 +13,17 @@ struct VertexOut
     float3 PosL : POSITION;
 };
  
-VertexOut VS(VertexIn vin)
+VertexOut VS(VertexIn vin, uint instanceID : SV_InstanceID)
 {
-	VertexOut vout;
+	VertexOut vout = (VertexOut)0.0f;
+
+	// 获取实例数据
+	InstanceData instData = gInstanceData[instanceID];
+	float4x4 world = instData.World;
 
 	vout.PosL = vin.PosL;
 	
-	float4 posW = mul(float4(vin.PosL, 1.0f), gWorld);
+	float4 posW = mul(float4(vin.PosL, 1.0f), world);
 
 	// 以摄像机为中心
 	posW.xyz += gEyePosW;
