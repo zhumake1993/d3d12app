@@ -2,6 +2,7 @@
 
 #include "../Common/d3dUtil.h"
 #include "../Common/UploadBuffer.h"
+#include "Manager.h"
 
 using namespace DirectX;
 
@@ -19,7 +20,8 @@ struct MaterialData
 	UINT MaterialPad2;
 };
 
-class MaterialManager
+class MaterialManager :
+	public Manager
 {
 public:
 

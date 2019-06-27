@@ -1,7 +1,7 @@
 #include "Box.h"
 
-Box::Box()
-	:GameObject()
+Box::Box(std::shared_ptr<CommonResource> commonResource)
+	:GameObject(commonResource)
 {
 	mGameObjectName = "box";
 
@@ -22,8 +22,4 @@ Box::~Box()
 
 void Box::Update(const GameTimer& gt)
 {
-	//mTranslation = XMFLOAT3(3.0f * cos(gt.TotalTime()), 2.0f, 3.0f * sin(gt.TotalTime()));
-	//mTranslation = XMFLOAT3(3.0f * cos(gt.TotalTime()*0.01), 2.0f, 3.0f * sin(gt.TotalTime()*0.01));
-	if (GetAsyncKeyState('Z') & 0x8000)
-		mRotation.y += gt.DeltaTime() * 0.2f;
 }

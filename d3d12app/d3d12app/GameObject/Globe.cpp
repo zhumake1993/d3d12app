@@ -1,7 +1,7 @@
 #include "Globe.h"
 
-Globe::Globe()
-	:GameObject()
+Globe::Globe(std::shared_ptr<CommonResource> commonResource)
+	:GameObject(commonResource)
 {
 	mGameObjectName = "globe";
 
@@ -21,6 +21,4 @@ Globe::~Globe()
 
 void Globe::Update(const GameTimer& gt)
 {
-	if (GetAsyncKeyState('X') & 0x8000)
-		mRotation.y += gt.DeltaTime() * 0.2f;
 }

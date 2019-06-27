@@ -2,6 +2,7 @@
 
 #include "../Common/d3dUtil.h"
 #include "../Common/GeometryGenerator.h"
+#include "Manager.h"
 
 struct Mesh
 {
@@ -29,7 +30,8 @@ struct Mesh
 	D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 };
 
-class MeshManager
+class MeshManager :
+	public Manager
 {
 public:
 	MeshManager(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);

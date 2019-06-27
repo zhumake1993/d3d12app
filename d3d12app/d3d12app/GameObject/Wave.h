@@ -7,7 +7,7 @@ class Wave :
 	public GameObject
 {
 public:
-	Wave(int m, int n, float dx, float dt, float speed, float damping);
+	Wave(std::shared_ptr<CommonResource> commonResource);
 	Wave(const Wave& rhs) = delete;
 	Wave& operator=(const Wave& rhs) = delete;
 	~Wave();

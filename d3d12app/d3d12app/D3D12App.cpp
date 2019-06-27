@@ -100,9 +100,11 @@ void D3D12App::Update(const GameTimer& gt)
 		CloseHandle(eventHandle);
 	}
 
+	// 注意，更新顺序很重要！
 	mMaterialManager->UpdateMaterialData();
 	mGameObjectManager->Update(gt);
-	mInstanceManager->UploadInstanceData(mCamera);
+	mInputManager->Update(gt);
+	mInstanceManager->UploadInstanceData();
 	UpdateFrameResource(gt);
 }
 
@@ -333,10 +335,13 @@ void D3D12App::OnKeyDown(WPARAM vkCode)
 	if (vkCode == '6') {
 		mCamera->mFrustumCullingEnabled = !mCamera->mFrustumCullingEnabled;
 	}
+
+	mInputManager->OnKeyDown(vkCode);
 }
 
 void D3D12App::OnKeyUp(WPARAM vkCode)
 {
+	mInputManager->OnKeyUp(vkCode);
 }
 
 void D3D12App::OnKeyboardInput(const GameTimer& gt)
@@ -402,20 +407,27 @@ void D3D12App::UpdateFrameResource(const GameTimer& gt)
 
 void D3D12App::BuildManagers()
 {
+	mCommonResource = std::make_shared<CommonResource>();
+
 	mTextureManager = std::make_shared<TextureManager>(md3dDevice.Get(), mCommandList.Get(), mCbvSrvUavDescriptorSize);
 
 	mMaterialManager = std::make_shared<MaterialManager>(md3dDevice.Get());
 
 	mMeshManager = std::make_shared<MeshManager>(md3dDevice.Get(), mCommandList.Get());
 
-	mInstanceManager = std::make_shared<InstanceManager>(md3dDevice.Get());
-	mInstanceManager->SetMeshManager(mMeshManager);
-	mInstanceManager->SetMaterialManager(mMaterialManager);
-	mInstanceManager->SetCamera(mCamera);
+	mInstanceManager = std::make_shared<InstanceManager>(md3dDevice.Get(), mCommonResource);
 
-	mGameObjectManager = std::make_shared<GameObjectManager>();
-	mGameObjectManager->SetInstanceManager(mInstanceManager);
-	mGameObjectManager->SetMaterialManager(mMaterialManager);
+	mGameObjectManager = std::make_shared<GameObjectManager>(mCommonResource);
+
+	mInputManager = std::make_shared<InputManager>();
+
+	mCommonResource->mTextureManager = mTextureManager;
+	mCommonResource->mMaterialManager = mMaterialManager;
+	mCommonResource->mMeshManager = mMeshManager;
+	mCommonResource->mInstanceManager = mInstanceManager;
+	mCommonResource->mGameObjectManager = mGameObjectManager;
+	mCommonResource->mInputManager = mInputManager;
+	mCommonResource->mCamera = mCamera;
 }
 
 void D3D12App::BuildEffects()
@@ -458,6 +470,7 @@ void D3D12App::BuildTextures()
 	std::vector<std::wstring> fileNames =
 	{
 		L"Textures/bricks.dds",
+		L"Textures/bricks_nmap.dds",
 		L"Textures/bricks2.dds",
 		L"Textures/bricks2_nmap.dds",
 		L"Textures/stone.dds",
@@ -486,7 +499,7 @@ void D3D12App::BuildMaterials()
 {
 	MaterialData bricks;
 	bricks.DiffuseMapIndex = mTextureManager->GetIndex("bricks");
-	bricks.NormalMapIndex = mTextureManager->GetIndex("default_nmap");
+	bricks.NormalMapIndex = mTextureManager->GetIndex("bricks_nmap");
 	bricks.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	bricks.FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
 	bricks.Roughness = 0.3f;
@@ -502,7 +515,7 @@ void D3D12App::BuildMaterials()
 
 	MaterialData stone;
 	stone.DiffuseMapIndex = mTextureManager->GetIndex("stone");
-	stone.NormalMapIndex = mTextureManager->GetIndex("default_nmap");
+	stone.NormalMapIndex = -1;
 	stone.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	stone.FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
 	stone.Roughness = 0.1f;
@@ -534,7 +547,7 @@ void D3D12App::BuildMaterials()
 
 	MaterialData grass;
 	grass.DiffuseMapIndex = mTextureManager->GetIndex("grass");
-	grass.NormalMapIndex = mTextureManager->GetIndex("default_nmap");
+	grass.NormalMapIndex = -1;
 	grass.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	grass.FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
 	grass.Roughness = 0.125f;
@@ -542,7 +555,7 @@ void D3D12App::BuildMaterials()
 
 	MaterialData water;
 	water.DiffuseMapIndex = mTextureManager->GetIndex("water1");
-	water.NormalMapIndex = mTextureManager->GetIndex("default_nmap");
+	water.NormalMapIndex = -1;
 	water.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
 	water.FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	water.Roughness = 0.0f;
@@ -550,7 +563,7 @@ void D3D12App::BuildMaterials()
 
 	MaterialData wirefence;
 	wirefence.DiffuseMapIndex = mTextureManager->GetIndex("WireFence");
-	wirefence.NormalMapIndex = mTextureManager->GetIndex("default_nmap");
+	wirefence.NormalMapIndex = -1;
 	wirefence.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	wirefence.FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	wirefence.Roughness = 0.25f;
@@ -558,7 +571,7 @@ void D3D12App::BuildMaterials()
 
 	MaterialData ice;
 	ice.DiffuseMapIndex = mTextureManager->GetIndex("ice");
-	ice.NormalMapIndex = mTextureManager->GetIndex("default_nmap");
+	ice.NormalMapIndex = -1;
 	ice.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	ice.FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	ice.Roughness = 0.0f;
@@ -581,201 +594,55 @@ void D3D12App::BuildMeshes()
 	mMeshManager->AddMesh("sphere", geoGen.CreateSphere(0.5f, 20, 20));
 	mMeshManager->AddMesh("cylinder", geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20));
 	mMeshManager->AddMesh("box2", geoGen.CreateBox(8.0f, 8.0f, 8.0f, 3));
-
-	auto hill = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
-	for (auto& v : hill.Vertices) {
-		v.Position.y = 0.3f * (v.Position.z * sinf(0.1f * v.Position.x) + v.Position.x * cosf(0.1f * v.Position.z));
-
-		XMFLOAT3 n(
-			-0.03f * v.Position.z * cosf(0.1f * v.Position.x) - 0.3f * cosf(0.1f * v.Position.z),
-			1.0f,
-			-0.3f * sinf(0.1f * v.Position.x) + 0.03f * v.Position.x * sinf(0.1f * v.Position.z));
-
-		XMVECTOR unitNormal = XMVector3Normalize(XMLoadFloat3(&n));
-		XMStoreFloat3(&n, unitNormal);
-		v.Normal = n;
-	}
-	mMeshManager->AddMesh("hill", hill);
-	
-	auto wave = std::make_unique<Wave>(128, 128, 1.0f, 0.03f, 4.0f, 0.2f);
-	// 顶点
-	std::vector<Vertex> vertices(wave->VertexCount());
-	for (int i = 0; i < wave->VertexCount(); ++i) {
-		vertices[i].Pos = wave->Position(i);
-		vertices[i].Normal = wave->Normal(i);
-		vertices[i].TexC.x = 0.5f + vertices[i].Pos.x / wave->Width();
-		vertices[i].TexC.y = 0.5f - vertices[i].Pos.z / wave->Depth();
-	}
-	// 索引
-	std::vector<std::uint16_t> indices(3 * wave->TriangleCount());
-	assert(wave->VertexCount() < 0x0000ffff);
-	int m = wave->RowCount();
-	int n = wave->ColumnCount();
-	int k = 0;
-	for (int i = 0; i < m - 1; ++i) {
-		for (int j = 0; j < n - 1; ++j) {
-			indices[k] = i * n + j;
-			indices[k + 1] = i * n + j + 1;
-			indices[k + 2] = (i + 1) * n + j;
-
-			indices[k + 3] = (i + 1) * n + j;
-			indices[k + 4] = i * n + j + 1;
-			indices[k + 5] = (i + 1) * n + j + 1;
-
-			k += 6;
-		}
-	}
-	mMeshManager->AddMesh("wave", vertices, indices);
-	wave->SetWavesVB(md3dDevice.Get());
-
-	wave->mGameObjectName = "wave";
-	wave->mTranslation = XMFLOAT3(0.0f, -20.0f, 0.0f);
-	wave->mMatName = "water";
-	XMStoreFloat4x4(&wave->mTexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
-	wave->mMeshName = "wave";
-	wave->mRenderLayer = (int)RenderLayer::Transparent;
-	//mGameObjectManager->AddGameObject(std::move(wave));
-
-	// skull
-	{
-		std::ifstream fin("Models/skull.txt");
-
-		if (!fin) {
-			MessageBox(0, L"Models/skull.txt not found.", 0, 0);
-			return;
-		}
-
-		UINT vcount = 0;
-		UINT tcount = 0;
-		std::string ignore;
-
-		fin >> ignore >> vcount;
-		fin >> ignore >> tcount;
-		fin >> ignore >> ignore >> ignore >> ignore;
-
-		std::vector<Vertex> vertices(vcount);
-		for (UINT i = 0; i < vcount; ++i) {
-			fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;
-			fin >> vertices[i].Normal.x >> vertices[i].Normal.y >> vertices[i].Normal.z;
-
-			XMVECTOR P = XMLoadFloat3(&vertices[i].Pos);
-
-			// 将点映射至单位球，并产生球纹理坐标
-			XMFLOAT3 spherePos;
-			XMStoreFloat3(&spherePos, XMVector3Normalize(P));
-
-			float theta = atan2f(spherePos.z, spherePos.x);
-
-			// Put in [0, 2pi].
-			if (theta < 0.0f)
-				theta += XM_2PI;
-
-			float phi = acosf(spherePos.y);
-
-			float u = theta / (2.0f * XM_PI);
-			float v = phi / XM_PI;
-
-			vertices[i].TexC = { u, v };
-		}
-
-		fin >> ignore;
-		fin >> ignore;
-		fin >> ignore;
-
-		std::vector<std::uint16_t> indices(3 * tcount);
-		for (UINT i = 0; i < tcount; ++i) {
-			fin >> indices[i * 3 + 0] >> indices[i * 3 + 1] >> indices[i * 3 + 2];
-		}
-
-		fin.close();
-
-		mMeshManager->AddMesh("skull", vertices, indices);
-	}
 }
 
 void D3D12App::BuildGameObjects()
 {
-	auto sky = std::make_unique<GameObject>();
-	sky->mGameObjectName = "sky";
-	sky->mScale = XMFLOAT3(5000.0f, 5000.0f, 5000.0f);
-	sky->mMatName = "sky";
-	sky->mMeshName = "sphere";
-	sky->mRenderLayer = (int)RenderLayer::Sky;
+	auto sky = std::make_unique<Sky>(mCommonResource);
 	mGameObjectManager->AddGameObject(std::move(sky));
 
-	auto box = std::make_unique<Box>();
+	auto box = std::make_unique<Box>(mCommonResource);
 	mGameObjectManager->AddGameObject(std::move(box));
 
-	auto globe = std::make_unique<Globe>();
+	auto globe = std::make_unique<Globe>(mCommonResource);
 	mGameObjectManager->AddGameObject(std::move(globe));
 
-	auto grid = std::make_unique<GameObject>();
-	grid->mGameObjectName = "grid";
-	grid->mMatName = "tile";
-	XMStoreFloat4x4(&grid->mTexTransform, XMMatrixScaling(8.0f, 8.0f, 1.0f));
-	grid->mMeshName = "grid";
-	grid->mRenderLayer = (int)RenderLayer::Opaque;
+	auto grid = std::make_unique<Grid>(mCommonResource);
 	mGameObjectManager->AddGameObject(std::move(grid));
 
-	XMMATRIX brickTexTransform = XMMatrixScaling(1.5f, 2.0f, 1.0f);
 	for (int i = 0; i < 5; ++i) {
-		auto leftCyl = std::make_unique<GameObject>();
+		auto leftCyl = std::make_unique<Cylinder>(mCommonResource);
 		leftCyl->mGameObjectName = "leftCyl" + std::to_string(i);
 		leftCyl->mTranslation = XMFLOAT3(-5.0f, 1.5f, -10.0f + i * 5.0f);
-		leftCyl->mMatName = "bricks";
-		XMStoreFloat4x4(&leftCyl->mTexTransform, XMMatrixScaling(1.5f, 2.0f, 1.0f));
-		leftCyl->mMeshName = "cylinder";
-		leftCyl->mRenderLayer = (int)RenderLayer::Opaque;
 		mGameObjectManager->AddGameObject(std::move(leftCyl));
 
-		auto rightCyl = std::make_unique<GameObject>();
+		auto rightCyl = std::make_unique<Cylinder>(mCommonResource);
 		rightCyl->mGameObjectName = "rightCyl" + std::to_string(i);
 		rightCyl->mTranslation = XMFLOAT3(+5.0f, 1.5f, -10.0f + i * 5.0f);
-		rightCyl->mMatName = "bricks";
-		XMStoreFloat4x4(&rightCyl->mTexTransform, XMMatrixScaling(1.5f, 2.0f, 1.0f));
-		rightCyl->mMeshName = "cylinder";
-		rightCyl->mRenderLayer = (int)RenderLayer::Opaque;
 		mGameObjectManager->AddGameObject(std::move(rightCyl));
 
-		auto leftSphere = std::make_unique<GameObject>();
+		auto leftSphere = std::make_unique<Sphere>(mCommonResource);
 		leftSphere->mGameObjectName = "leftSphere" + std::to_string(i);
 		leftSphere->mTranslation = XMFLOAT3(-5.0f, 3.5f, -10.0f + i * 5.0f);
-		leftSphere->mMatName = "mirror";
-		leftSphere->mMeshName = "sphere";
-		leftSphere->mRenderLayer = (int)RenderLayer::Opaque;
 		mGameObjectManager->AddGameObject(std::move(leftSphere));
 
-		auto rightSphere = std::make_unique<GameObject>();
+		auto rightSphere = std::make_unique<Sphere>(mCommonResource);
 		rightSphere->mGameObjectName = "rightSphere" + std::to_string(i);
 		rightSphere->mTranslation = XMFLOAT3(+5.0f, 3.5f, -10.0f + i * 5.0f);
-		rightSphere->mMatName = "mirror";
-		rightSphere->mMeshName = "sphere";
-		rightSphere->mRenderLayer = (int)RenderLayer::Opaque;
 		mGameObjectManager->AddGameObject(std::move(rightSphere));
 	}
 
-	auto hill = std::make_unique<Hill>();
-	hill->mGameObjectName = "hill";
-	hill->mTranslation = XMFLOAT3(0.0f, -20.0f, 0.0f);
-	hill->mMatName = "grass";
-	XMStoreFloat4x4(&hill->mTexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
-	hill->mMeshName = "hill";
-	hill->mRenderLayer = (int)RenderLayer::Opaque;
+	auto hill = std::make_unique<Hill>(mCommonResource);
 	mGameObjectManager->AddGameObject(std::move(hill));
 
-	auto box2 = std::make_unique<GameObject>();
-	box2->mGameObjectName = "box2";
-	box2->mTranslation = XMFLOAT3(3.0f, -18.0f, -9.0f);
-	box2->mMatName = "wirefence";
-	box2->mMeshName = "box2";
-	box2->mRenderLayer = (int)RenderLayer::AlphaTested;
-	mGameObjectManager->AddGameObject(std::move(box2));
+	auto wave = std::make_unique<Wave>(mCommonResource);
+	wave->SetWavesVB(md3dDevice.Get());
+	mGameObjectManager->AddGameObject(std::move(wave));
 
-	auto skull = std::make_unique<Skull>();
-	skull->mGameObjectName = "skull";
-	skull->mMatName = "skullMat";
-	skull->mMeshName = "skull";
-	skull->mRenderLayer = (int)RenderLayer::Opaque;
+	auto wirefenceBox = std::make_unique<WirefenceBox>(mCommonResource);
+	mGameObjectManager->AddGameObject(std::move(wirefenceBox));
+
+	auto skull = std::make_unique<Skull>(mCommonResource);
 	mGameObjectManager->AddGameObject(std::move(skull));
 }
 

@@ -1,7 +1,6 @@
 f:\d3d12app\d3d12app\d3d12app\x64\debug\vc142.pdb
 f:\d3d12app\d3d12app\d3d12app\x64\debug\vc142.idb
-f:\d3d12app\d3d12app\d3d12app\x64\debug\gameobjectmanager.obj
-f:\d3d12app\d3d12app\d3d12app\x64\debug\gameobject.obj
+f:\d3d12app\d3d12app\d3d12app\x64\debug\box.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\wireframe.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\sobelfilter.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\shaderresource.obj
@@ -11,6 +10,7 @@ f:\d3d12app\d3d12app\d3d12app\x64\debug\inversefilter.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\drawquad.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\depthcomplexityusestencil.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\depthcomplexityuseblend.obj
+f:\d3d12app\d3d12app\d3d12app\x64\debug\cubemap.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\blurfilter.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\d3d12app.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\mathhelper.obj
@@ -23,19 +23,6 @@ f:\d3d12app\d3d12app\d3d12app\x64\debug\camera.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\themain.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\texturemanager.obj
 f:\d3d12app\d3d12app\d3d12app\x64\debug\meshmanager.obj
-f:\d3d12app\d3d12app\d3d12app\x64\debug\materialmanager.obj
-f:\d3d12app\d3d12app\d3d12app\x64\debug\instancemanager.obj
-f:\d3d12app\d3d12app\d3d12app\x64\debug\instance.obj
-f:\d3d12app\d3d12app\d3d12app\x64\debug\wave.obj
-f:\d3d12app\d3d12app\d3d12app\x64\debug\hill.obj
-f:\d3d12app\d3d12app\d3d12app\x64\debug\cubemap.obj
-f:\d3d12app\d3d12app\d3d12app\x64\debug\skull.obj
-f:\d3d12app\d3d12app\x64\debug\d3d12app.exe
-f:\d3d12app\d3d12app\x64\debug\d3d12app.ilk
-f:\d3d12app\d3d12app\x64\debug\d3d12app.pdb
 f:\d3d12app\d3d12app\d3d12app\x64\debug\d3d12app.tlog\cl.command.1.tlog
 f:\d3d12app\d3d12app\d3d12app\x64\debug\d3d12app.tlog\cl.read.1.tlog
 f:\d3d12app\d3d12app\d3d12app\x64\debug\d3d12app.tlog\cl.write.1.tlog
-f:\d3d12app\d3d12app\d3d12app\x64\debug\d3d12app.tlog\link.command.1.tlog
-f:\d3d12app\d3d12app\d3d12app\x64\debug\d3d12app.tlog\link.read.1.tlog
-f:\d3d12app\d3d12app\d3d12app\x64\debug\d3d12app.tlog\link.write.1.tlog

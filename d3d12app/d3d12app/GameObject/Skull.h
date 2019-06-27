@@ -6,7 +6,7 @@ class Skull :
 	public GameObject
 {
 public:
-	Skull();
+	Skull(std::shared_ptr<CommonResource> commonResource);
 	~Skull();
 
 private:

@@ -3,7 +3,10 @@
 #include "../Common/d3dUtil.h"
 #include "../Common/Camera.h"
 #include "InstanceManager.h"
+#include "TextureManager.h"
 #include "MaterialManager.h"
+#include "MeshManager.h"
+#include "InputManager.h"
 
 using namespace DirectX;
 
@@ -12,8 +15,17 @@ class GameObject
 	friend class GameObjectManager;
 
 public:
-	GameObject();
+	GameObject(std::shared_ptr<CommonResource> commonResource);
 	virtual ~GameObject();
+
+protected:
+	std::shared_ptr<MeshManager> GetMeshManager();
+	std::shared_ptr<InstanceManager> GetInstanceManager();
+	std::shared_ptr<MaterialManager> GetMaterialManager();
+
+	bool GetKeyDown(int key);
+	bool GetKeyPress(int key);
+	bool GetKeyUp(int key);
 
 private:
 	virtual void Update(const GameTimer& gt);
@@ -35,6 +47,5 @@ public:
 	int mRenderLayer = -1;
 
 protected:
-	std::shared_ptr<InstanceManager> mInstanceManager;
-	std::shared_ptr<MaterialManager> mMaterialManager;
+	std::shared_ptr<CommonResource> mCommonResource;
 };

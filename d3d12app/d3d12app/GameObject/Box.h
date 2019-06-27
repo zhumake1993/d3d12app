@@ -6,7 +6,7 @@ class Box :
 	public GameObject
 {
 public:
-	Box();
+	Box(std::shared_ptr<CommonResource> commonResource);
 	~Box();
 
 private:

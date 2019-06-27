@@ -2,9 +2,27 @@
 #include <cassert>
 #include <ppl.h>
 
-Wave::Wave(int m, int n, float dx, float dt, float speed, float damping)
-	:GameObject()
+Wave::Wave(std::shared_ptr<CommonResource> commonResource)
+	:GameObject(commonResource)
 {
+	mGameObjectName = "wave";
+	mTranslation = XMFLOAT3(0.0f, -20.0f, 0.0f);
+	mMatName = "water";
+	XMStoreFloat4x4(&mTexTransform, XMMatrixScaling(5.0f, 5.0f, 1.0f));
+	mMeshName = "wave";
+	mRenderLayer = (int)RenderLayer::Transparent;
+
+
+	// 参数
+	int m = 128;
+	int n = 128; 
+	float dx = 1.0f;
+	float dt = 0.03f;
+	float speed = 4.0f;
+	float damping = 0.2f;
+
+
+
 	mNumRows = m;
 	mNumCols = n;
 
@@ -39,6 +57,38 @@ Wave::Wave(int m, int n, float dx, float dt, float speed, float damping)
 			mNormals[i * n + j] = XMFLOAT3(0.0f, 1.0f, 0.0f);
 			mTangentX[i * n + j] = XMFLOAT3(1.0f, 0.0f, 0.0f);
 		}
+	}
+
+	// 创建并添加mesh
+	{
+		// 顶点
+		std::vector<Vertex> vertices(VertexCount());
+		for (int i = 0; i < VertexCount(); ++i) {
+			vertices[i].Pos = Position(i);
+			vertices[i].Normal = Normal(i);
+			vertices[i].TexC.x = 0.5f + vertices[i].Pos.x / Width();
+			vertices[i].TexC.y = 0.5f - vertices[i].Pos.z / Depth();
+		}
+		// 索引
+		std::vector<std::uint16_t> indices(3 * TriangleCount());
+		assert(VertexCount() < 0x0000ffff);
+		int m = RowCount();
+		int n = ColumnCount();
+		int k = 0;
+		for (int i = 0; i < m - 1; ++i) {
+			for (int j = 0; j < n - 1; ++j) {
+				indices[k] = i * n + j;
+				indices[k + 1] = i * n + j + 1;
+				indices[k + 2] = (i + 1) * n + j;
+
+				indices[k + 3] = (i + 1) * n + j;
+				indices[k + 4] = i * n + j + 1;
+				indices[k + 5] = (i + 1) * n + j + 1;
+
+				k += 6;
+			}
+		}
+		GetMeshManager()->AddMesh("wave", vertices, indices);
 	}
 }
 
@@ -196,13 +246,13 @@ void Wave::Update(const GameTimer& gt)
 	}
 
 	// 将波浪渲染项的动态顶点缓冲设置为当前帧的顶点缓冲
-	auto mesh = mInstanceManager->mInstanceLayers[mRenderLayer][mMeshName]->GetMesh();
+	auto mesh = GetInstanceManager()->mInstanceLayers[mRenderLayer][mMeshName]->GetMesh();
 
 	mesh->VertexBufferGPU = currWavesVB->Resource();
 	mesh->VertexBufferView.BufferLocation = mesh->VertexBufferGPU->GetGPUVirtualAddress();
 
 	// 更新纹理转换矩阵，营造一种流动的感觉
-	auto mat = mMaterialManager->GetMaterialData(mMatName);
+	auto mat = GetMaterialManager()->GetMaterialData(mMatName);
 
 	float& tu = mat.MatTransform(3, 0);
 	float& tv = mat.MatTransform(3, 1);
@@ -219,5 +269,5 @@ void Wave::Update(const GameTimer& gt)
 	mat.MatTransform(3, 0) = tu;
 	mat.MatTransform(3, 1) = tv;
 
-	mMaterialManager->SetMaterialData(mMatName, mat);
+	GetMaterialManager()->SetMaterialData(mMatName, mat);
 }

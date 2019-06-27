@@ -6,7 +6,7 @@ class Hill :
 	public GameObject
 {
 public:
-	Hill();
+	Hill(std::shared_ptr<CommonResource> commonResource);
 	~Hill();
 
 private:

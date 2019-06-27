@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../Common/d3dUtil.h"
-#include "../Common/Camera.h"
 #include "../Common/UploadBuffer.h"
 #include "MaterialManager.h"
 #include "MeshManager.h"
@@ -24,7 +23,7 @@ class Instance
 	friend class InstanceManager;
 
 public:
-	Instance(ID3D12Device* device);
+	Instance(ID3D12Device* device, std::shared_ptr<CommonResource> commonResource);
 	virtual ~Instance();
 
 	std::shared_ptr<Mesh> GetMesh();
@@ -37,14 +36,14 @@ public:
 	void UpdateInstanceData(const std::string& gameObjectName, const XMFLOAT4X4& world,
 		const UINT& matIndex, const XMFLOAT4X4& texTransform);
 
-	void UploadInstanceData(std::shared_ptr<Camera> camera);
+	void UploadInstanceData();
 
 	void Draw(ID3D12GraphicsCommandList* cmdList);
 
 	bool Pick(FXMVECTOR rayOriginW, FXMVECTOR rayDirW, std::string& name, float& tmin, XMVECTOR& point);
 
 private:
-	//
+	std::shared_ptr<Camera> GetCamera();
 
 public:
 	//
@@ -67,5 +66,5 @@ private:
 
 private:
 
-	std::shared_ptr<Camera> mCamera;
+	std::shared_ptr<CommonResource> mCommonResource;
 };

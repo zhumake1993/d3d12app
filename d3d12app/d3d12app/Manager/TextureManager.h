@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Common/d3dUtil.h"
+#include "Manager.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -16,7 +17,8 @@ struct Texture
 	UINT Index;
 };
 
-class TextureManager
+class TextureManager :
+	public Manager
 {
 public:
 	TextureManager(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, UINT CbvSrvUavDescriptorSize);

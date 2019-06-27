@@ -7,6 +7,7 @@
 #include "Common/GeometryGenerator.h"
 #include "Common/Camera.h"
 
+#include "Manager/Manager.h"
 #include "Manager/GameObjectManager.h"
 #include "Manager/InstanceManager.h"
 #include "Manager/TextureManager.h"
@@ -26,18 +27,19 @@
 #include "Effect/MultiplyFilter.h"
 #include "Effect/CubeMap.h"
 
+#include "GameObject/Sky.h"
 #include "GameObject/Box.h"
+#include "GameObject/WirefenceBox.h"
 #include "GameObject/Hill.h"
 #include "GameObject/Wave.h"
 #include "GameObject/Skull.h"
 #include "GameObject/Globe.h"
+#include "GameObject/Grid.h"
+#include "GameObject/Cylinder.h"
+#include "GameObject/Sphere.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
-
-struct CommonResource {
-
-};
 
 class D3D12App : public D3DApp
 {
@@ -81,11 +83,15 @@ private:
 	void Pick(int sx, int sy);
 
 private:
+
+	std::shared_ptr<CommonResource> mCommonResource;
+
 	std::shared_ptr<TextureManager> mTextureManager;
 	std::shared_ptr<MaterialManager> mMaterialManager;
 	std::shared_ptr<MeshManager> mMeshManager;
 	std::shared_ptr<InstanceManager> mInstanceManager;
 	std::shared_ptr<GameObjectManager> mGameObjectManager;
+	std::shared_ptr<InputManager> mInputManager;
 
 	std::shared_ptr<Camera> mCamera;
 	POINT mLastMousePos;

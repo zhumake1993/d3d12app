@@ -6,7 +6,7 @@ class Globe :
 	public GameObject
 {
 public:
-	Globe();
+	Globe(std::shared_ptr<CommonResource> commonResource);
 	~Globe();
 
 private:

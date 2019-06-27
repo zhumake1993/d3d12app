@@ -1,27 +1,13 @@
 #include "InstanceManager.h"
 
-InstanceManager::InstanceManager(ID3D12Device* device)
+InstanceManager::InstanceManager(ID3D12Device* device, std::shared_ptr<CommonResource> commonResource)
 {
 	mDevice = device;
+	mCommonResource = commonResource;
 }
 
 InstanceManager::~InstanceManager()
 {
-}
-
-void InstanceManager::SetMeshManager(std::shared_ptr<MeshManager> meshManager)
-{
-	mMeshManager = meshManager;
-}
-
-void InstanceManager::SetMaterialManager(std::shared_ptr<MaterialManager> materialManager)
-{
-	mMaterialManager = materialManager;
-}
-
-void InstanceManager::SetCamera(std::shared_ptr<Camera> camera)
-{
-	mCamera = camera;
 }
 
 void InstanceManager::AddInstance(const std::string& gameObjectName, const XMFLOAT4X4& world,
@@ -33,22 +19,22 @@ void InstanceManager::AddInstance(const std::string& gameObjectName, const XMFLO
 	if (instanceMap.find(meshName) != instanceMap.end()) {
 		// 该meshName已存在
 
-		instanceMap[meshName]->AddInstanceData(gameObjectName, world, mMaterialManager->GetIndex(matName), texTransform);
+		instanceMap[meshName]->AddInstanceData(gameObjectName, world, GetMaterialManager()->GetIndex(matName), texTransform);
 	} else {
 		// 该meshName不存在
 
-		if (mMeshManager->mMeshes.find(meshName) == mMeshManager->mMeshes.end()) {
+		if (GetMeshManager()->mMeshes.find(meshName) == GetMeshManager()->mMeshes.end()) {
 			OutputMessageBox("Can not find the mesh!");
 			return;
 		}
 
-		auto instance = std::make_unique<Instance>(mDevice);
+		auto instance = std::make_unique<Instance>(mDevice, mCommonResource);
 		instance->mMeshName = meshName;
-		instance->mMesh = mMeshManager->mMeshes[meshName];
+		instance->mMesh = GetMeshManager()->mMeshes[meshName];
 		instance->CalculateBoundingBox();
-		instance->mCamera = mCamera;
+		instance->GetCamera() = GetCamera();
 
-		instance->AddInstanceData(gameObjectName, world, mMaterialManager->GetIndex(matName), texTransform);
+		instance->AddInstanceData(gameObjectName, world, GetMaterialManager()->GetIndex(matName), texTransform);
 
 		instanceMap[meshName] = std::move(instance);
 	}
@@ -59,14 +45,14 @@ void InstanceManager::UpdateInstance(const std::string& gameObjectName, const XM
 	const std::string& meshName, const int randerLayer)
 {
 	auto& instanceMap = mInstanceLayers[randerLayer];
-	instanceMap[meshName]->UpdateInstanceData(gameObjectName, world, mMaterialManager->GetIndex(matName), texTransform);
+	instanceMap[meshName]->UpdateInstanceData(gameObjectName, world, GetMaterialManager()->GetIndex(matName), texTransform);
 }
 
-void InstanceManager::UploadInstanceData(std::shared_ptr<Camera> camera)
+void InstanceManager::UploadInstanceData()
 {
 	for (auto &layer : mInstanceLayers) {
 		for (auto& p : layer) {
-			p.second->UploadInstanceData(camera);
+			p.second->UploadInstanceData();
 		}
 	}
 }
@@ -119,4 +105,19 @@ bool InstanceManager::Pick(FXMVECTOR rayOriginW, FXMVECTOR rayDirW)
 	}
 
 	return result;
+}
+
+std::shared_ptr<MeshManager> InstanceManager::GetMeshManager()
+{
+	return std::static_pointer_cast<MeshManager>(mCommonResource->mMeshManager);
+}
+
+std::shared_ptr<MaterialManager> InstanceManager::GetMaterialManager()
+{
+	return std::static_pointer_cast<MaterialManager>(mCommonResource->mMaterialManager);
+}
+
+std::shared_ptr<Camera> InstanceManager::GetCamera()
+{
+	return std::static_pointer_cast<Camera>(mCommonResource->mCamera);
 }
