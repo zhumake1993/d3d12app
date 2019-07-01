@@ -54,6 +54,9 @@
     <FxCompile Include="Shaders\Multiply.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
+    <FxCompile Include="Shaders\Shadows.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D3D12App.cpp">
@@ -172,6 +175,9 @@
     </ClCompile>
     <ClCompile Include="Manager\Manager.cpp">
       <Filter>Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Effect\ShadowMap.cpp">
+      <Filter>Effect</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -297,6 +303,9 @@
     </ClInclude>
     <ClInclude Include="Manager\Manager.h">
       <Filter>Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Effect\ShadowMap.h">
+      <Filter>Effect</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

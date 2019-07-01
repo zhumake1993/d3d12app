@@ -26,6 +26,7 @@
 #include "Effect/InverseFilter.h"
 #include "Effect/MultiplyFilter.h"
 #include "Effect/CubeMap.h"
+#include "Effect/ShadowMap.h"
 
 #include "GameObject/Sky.h"
 #include "GameObject/Box.h"
@@ -129,5 +130,15 @@ private:
 	std::unique_ptr<MultiplyFilter> mMultiplyFilter;
 
 	std::unique_ptr<CubeMap> mCubeMap;
+
+	std::unique_ptr<ShadowMap> mShadowMap;
+
+	XMFLOAT3 mRotatedLightDirections[3];
+	float mLightRotationAngle = 0.0f;
+	XMFLOAT3 mBaseLightDirections[3] = {
+		XMFLOAT3(0.57735f, -0.57735f, 0.57735f),
+		XMFLOAT3(-0.57735f, -0.57735f, 0.57735f),
+		XMFLOAT3(0.0f, -0.707f, -0.707f)
+	};
 };
 

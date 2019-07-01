@@ -100,11 +100,24 @@ void D3D12App::Update(const GameTimer& gt)
 		CloseHandle(eventHandle);
 	}
 
+	// 移动光
+	mLightRotationAngle += 0.1f * gt.DeltaTime();
+	XMMATRIX R = XMMatrixRotationY(mLightRotationAngle);
+	for (int i = 0; i < 3; ++i) {
+		XMVECTOR lightDir = XMLoadFloat3(&mBaseLightDirections[i]);
+		lightDir = XMVector3TransformNormal(lightDir, R);
+		XMStoreFloat3(&mRotatedLightDirections[i], lightDir);
+	}
+
 	// 注意，更新顺序很重要！
 	mMaterialManager->UpdateMaterialData();
 	mGameObjectManager->Update(gt);
 	mInputManager->Update(gt);
 	mInstanceManager->UploadInstanceData();
+
+	//
+	mShadowMap->Update(mRotatedLightDirections[0]);
+
 	UpdateFrameResource(gt);
 }
 
@@ -155,7 +168,7 @@ void D3D12App::Draw(const GameTimer& gt)
 	mCommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
 
 	// 绑定所有的纹理
-	mCommandList->SetGraphicsRootDescriptorTable(4, mTextureManager->GetGpuSrvTex());
+	mCommandList->SetGraphicsRootDescriptorTable(5, mTextureManager->GetGpuSrvTex());
 
 	// 绑定天空球立方体贴图
 	mCommandList->SetGraphicsRootDescriptorTable(3, mTextureManager->GetGpuSrvCube());
@@ -170,10 +183,7 @@ void D3D12App::Draw(const GameTimer& gt)
 		mDepthComplexityUseBlend->Draw(mInstanceManager);
 	}
 	else {
-		// 绘制动态立方体贴图时要关闭平截头剔除
-		mCamera->mFrustumCullingEnabled = false;
-
-		mCubeMap->DrawSceneToCubeMap(mInstanceManager, mPSOs);
+		mShadowMap->DrawSceneToShadowMap(mInstanceManager);
 
 		//设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
 		mCommandList->RSSetViewports(1, &mScreenViewport);
@@ -190,24 +200,52 @@ void D3D12App::Draw(const GameTimer& gt)
 		auto passCB = mPassCB->GetCurrResource()->Resource();
 		mCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
 
-		// 使用动态立方体贴图绘制动态反射物体
-
-		// 绑定动态立方体贴图的描述符堆
-		ID3D12DescriptorHeap* descriptorHeapsCube[] = { mCubeMap->GetSrvDescriptorHeapPtr() };
-		mCommandList->SetDescriptorHeaps(_countof(descriptorHeapsCube), descriptorHeapsCube);
-
-		mCommandList->SetGraphicsRootDescriptorTable(3, mCubeMap->Srv());
-
-		mCommandList->SetPipelineState(mPSOs["opaque"].Get());
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::OpaqueDynamicReflectors);
-
-		// 使用静态立方体贴图绘制动态其他物体
-
-		// 绑定纹理的描述符堆
-		ID3D12DescriptorHeap* descriptorHeapsTex[] = { mTextureManager->GetSrvDescriptorHeapPtr() };
-		mCommandList->SetDescriptorHeaps(_countof(descriptorHeapsTex), descriptorHeapsTex);
-
+		// 绑定天空球立方体贴图
 		mCommandList->SetGraphicsRootDescriptorTable(3, mTextureManager->GetGpuSrvCube());
+
+		// 绑定阴影贴图
+		ID3D12DescriptorHeap* descriptorHeapsCube[] = { mShadowMap->GetSrvDescriptorHeapPtr() };
+		mCommandList->SetDescriptorHeaps(_countof(descriptorHeapsCube), descriptorHeapsCube);
+		mCommandList->SetGraphicsRootDescriptorTable(4, mShadowMap->Srv());
+
+		//// 绘制动态立方体贴图时要关闭平截头剔除
+		//mCamera->mFrustumCullingEnabled = false;
+
+		//mCubeMap->DrawSceneToCubeMap(mInstanceManager, mPSOs);
+
+		////设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
+		//mCommandList->RSSetViewports(1, &mScreenViewport);
+		//mCommandList->RSSetScissorRects(1, &mScissorRect);
+
+		////清空后背缓冲和深度模板缓冲
+		//mCommandList->ClearRenderTargetView(mRenderTarget->Rtv(), DirectX::Colors::LightSteelBlue, 0, nullptr);
+		//mCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+
+		////设置渲染目标
+		//mCommandList->OMSetRenderTargets(1, &mRenderTarget->Rtv(), true, &DepthStencilView());
+
+		//// 绑定常量缓冲
+		//auto passCB = mPassCB->GetCurrResource()->Resource();
+		//mCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
+
+		//// 使用动态立方体贴图绘制动态反射物体
+
+		//// 绑定动态立方体贴图的描述符堆
+		//ID3D12DescriptorHeap* descriptorHeapsCube[] = { mCubeMap->GetSrvDescriptorHeapPtr() };
+		//mCommandList->SetDescriptorHeaps(_countof(descriptorHeapsCube), descriptorHeapsCube);
+
+		//mCommandList->SetGraphicsRootDescriptorTable(3, mCubeMap->Srv());
+
+		//mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+		//mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::OpaqueDynamicReflectors);
+
+		//// 使用静态立方体贴图绘制动态其他物体
+
+		//// 绑定纹理的描述符堆
+		//ID3D12DescriptorHeap* descriptorHeapsTex[] = { mTextureManager->GetSrvDescriptorHeapPtr() };
+		//mCommandList->SetDescriptorHeaps(_countof(descriptorHeapsTex), descriptorHeapsTex);
+
+		//mCommandList->SetGraphicsRootDescriptorTable(3, mTextureManager->GetGpuSrvCube());
 
 		mCommandList->SetPipelineState(mPSOs["opaque"].Get());
 		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Opaque);
@@ -379,12 +417,16 @@ void D3D12App::UpdateFrameResource(const GameTimer& gt)
 	XMMATRIX invProj = XMMatrixInverse(&XMMatrixDeterminant(proj), proj);
 	XMMATRIX invViewProj = XMMatrixInverse(&XMMatrixDeterminant(viewProj), viewProj);
 
+	XMMATRIX shadowTransform = XMLoadFloat4x4(&mShadowMap->GetShadowTransform());
+
 	XMStoreFloat4x4(&mainPassCB.View, XMMatrixTranspose(view));
 	XMStoreFloat4x4(&mainPassCB.InvView, XMMatrixTranspose(invView));
 	XMStoreFloat4x4(&mainPassCB.Proj, XMMatrixTranspose(proj));
 	XMStoreFloat4x4(&mainPassCB.InvProj, XMMatrixTranspose(invProj));
 	XMStoreFloat4x4(&mainPassCB.ViewProj, XMMatrixTranspose(viewProj));
 	XMStoreFloat4x4(&mainPassCB.InvViewProj, XMMatrixTranspose(invViewProj));
+	XMStoreFloat4x4(&mainPassCB.ShadowTransform, XMMatrixTranspose(shadowTransform));
+
 	mainPassCB.EyePosW = mCamera->GetPosition3f();
 	mainPassCB.RenderTargetSize = XMFLOAT2((float)mClientWidth, (float)mClientHeight);
 	mainPassCB.InvRenderTargetSize = XMFLOAT2(1.0f / mClientWidth, 1.0f / mClientHeight);
@@ -393,11 +435,11 @@ void D3D12App::UpdateFrameResource(const GameTimer& gt)
 	mainPassCB.TotalTime = gt.TotalTime();
 	mainPassCB.DeltaTime = gt.DeltaTime();
 	mainPassCB.AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
-	mainPassCB.Lights[0].Direction = { 0.57735f, -0.57735f, 0.57735f };
-	mainPassCB.Lights[0].Strength = { 0.8f, 0.8f, 0.8f };
-	mainPassCB.Lights[1].Direction = { -0.57735f, -0.57735f, 0.57735f };
+	mainPassCB.Lights[0].Direction = mRotatedLightDirections[0];
+	mainPassCB.Lights[0].Strength = { 0.9f, 0.8f, 0.7f };
+	mainPassCB.Lights[1].Direction = mRotatedLightDirections[1];
 	mainPassCB.Lights[1].Strength = { 0.4f, 0.4f, 0.4f };
-	mainPassCB.Lights[2].Direction = { 0.0f, -0.707f, -0.707f };
+	mainPassCB.Lights[2].Direction = mRotatedLightDirections[2];
 	mainPassCB.Lights[2].Strength = { 0.2f, 0.2f, 0.2f };
 
 	mPassCB->Copy(0, mainPassCB);
@@ -463,6 +505,15 @@ void D3D12App::BuildEffects()
 		DXGI_FORMAT_R8G8B8A8_UNORM, mDepthStencilFormat,
 		mCbvSrvUavDescriptorSize, mRtvDescriptorSize, mDsvDescriptorSize);
 	mCubeMap->BuildCubeFaceCamera(0.0f, 2.0f, 0.0f);
+
+	mShadowMap = std::make_unique<ShadowMap>(md3dDevice.Get(), mCommandList.Get(), 2048, 2048);
+	// 手动设置场景的包围球
+	// 通常需要迭代所有的顶点来计算包围球
+	BoundingSphere sceneBounds;
+	sceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	sceneBounds.Radius = sqrtf(10.0f * 10.0f + 15.0f * 15.0f);
+	mShadowMap->SetBoundingSphere(sceneBounds);
+
 }
 
 void D3D12App::BuildTextures()
@@ -651,16 +702,20 @@ void D3D12App::BuildRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE texCubeMap;
 	texCubeMap.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
 
-	CD3DX12_DESCRIPTOR_RANGE texTable;
-	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, mTextureManager->GetMaxNumTextures(), 1, 0);
+	CD3DX12_DESCRIPTOR_RANGE texShadowMap;
+	texShadowMap.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
 
-	CD3DX12_ROOT_PARAMETER slotRootParameter[5];
+	CD3DX12_DESCRIPTOR_RANGE texTable;
+	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, mTextureManager->GetMaxNumTextures(), 2, 0);
+
+	CD3DX12_ROOT_PARAMETER slotRootParameter[6];
 
 	slotRootParameter[0].InitAsShaderResourceView(0, 1); // 结构化缓冲InstanceData
 	slotRootParameter[1].InitAsConstantBufferView(1); // 常量缓冲PassConstants
 	slotRootParameter[2].InitAsShaderResourceView(1, 1); // 结构化缓冲MaterialData
 	slotRootParameter[3].InitAsDescriptorTable(1, &texCubeMap, D3D12_SHADER_VISIBILITY_PIXEL); // 立方体贴图
-	slotRootParameter[4].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL); // 纹理
+	slotRootParameter[4].InitAsDescriptorTable(1, &texShadowMap, D3D12_SHADER_VISIBILITY_PIXEL); // 阴影贴图
+	slotRootParameter[5].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL); // 纹理
 
 	auto staticSamplers = d3dUtil::GetStaticSamplers();
 
@@ -793,6 +848,7 @@ void D3D12App::BuildPSOs()
 	mSobelFilter->SetPSODesc(opaquePsoDesc);
 	mInverseFilter->SetPSODesc(opaquePsoDesc);
 	mMultiplyFilter->SetPSODesc(opaquePsoDesc);
+	mShadowMap->SetPSODesc(opaquePsoDesc);
 
 	//
 	// 天空球
