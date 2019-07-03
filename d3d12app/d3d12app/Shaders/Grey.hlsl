@@ -51,7 +51,7 @@ VertexOut VS(VertexIn vin, uint instanceID : SV_InstanceID)
 
 float4 PS(VertexOut pin) : SV_Target
 {
-	return float4(0.05f, 0.05f, 0.05f, 1.0f);
+	return float4(0.1f, 0.1f, 0.1f, 1.0f);
 }
 
 

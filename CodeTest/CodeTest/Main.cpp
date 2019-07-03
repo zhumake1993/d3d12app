@@ -1,17 +1,20 @@
 #include <iostream>
 #include <string>
 #include <Windows.h>
+#include "test.h"
 
 using namespace std;
 
-void add(int a) {
-	//
+void kk() {
+	gtest->tt();
 }
 
 int main()
 {
-	int a = 3;
-	add(int(3));
+	std::unique_ptr<test> gtest = std::make_unique<test>();
+	gtest->tt();
+
+	cout << "hellow" << endl;
 
 	return 0;
 }

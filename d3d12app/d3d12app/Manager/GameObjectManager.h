@@ -1,28 +1,29 @@
 #pragma once
 
 #include "GameObject.h"
-#include "Manager.h"
 
 using namespace DirectX;
 
-class GameObjectManager :
-	public Manager
+class GameObjectManager
 {
 public:
-	GameObjectManager(std::shared_ptr<CommonResource> commonResource);
+	GameObjectManager();
 	~GameObjectManager();
+
+	void Initialize();
 
 	void AddGameObject(std::unique_ptr<GameObject> gameObject);
 
-	void Update(const GameTimer& gt);
+	void Update();
 
 private:
-	std::shared_ptr<InstanceManager> GetInstanceManager();
+	//
 
 public:
 	//
 
 private:
 	std::unordered_map<std::string, std::unique_ptr<GameObject>> mGameObjects;
-	std::shared_ptr<CommonResource> mCommonResource;
 };
+
+extern std::unique_ptr<GameObjectManager> gGameObjectManager;

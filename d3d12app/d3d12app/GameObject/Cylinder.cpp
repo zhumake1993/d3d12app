@@ -1,7 +1,7 @@
 #include "Cylinder.h"
 
-Cylinder::Cylinder(std::shared_ptr<CommonResource> commonResource)
-	:GameObject(commonResource)
+Cylinder::Cylinder()
+	:GameObject()
 {
 	mMatName = "bricks";
 	XMStoreFloat4x4(&mTexTransform, XMMatrixScaling(1.5f, 2.0f, 1.0f));
@@ -15,6 +15,6 @@ Cylinder::~Cylinder()
 {
 }
 
-void Cylinder::Update(const GameTimer& gt)
+void Cylinder::Update()
 {
 }

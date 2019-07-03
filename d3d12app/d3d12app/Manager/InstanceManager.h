@@ -1,40 +1,42 @@
 #pragma once
 
 #include "Instance.h"
-#include "Manager.h"
+#include "MaterialManager.h"
 
 using namespace DirectX;
 
-class InstanceManager :
-	public Manager
+class InstanceManager
 {
 public:
-	InstanceManager(ID3D12Device* device, std::shared_ptr<CommonResource> commonResource);
+	InstanceManager();
 	~InstanceManager();
+
+	void Initialize();
 
 	void AddInstance(const std::string& gameObjectName, const XMFLOAT4X4& world,
 		const std::string& matName, const XMFLOAT4X4& texTransform,
-		const std::string& meshName, const int randerLayer);
+		const std::string& meshName, const int randerLayer,
+		const bool receiveShadow);
 
 	void UpdateInstance(const std::string& gameObjectName, const XMFLOAT4X4& world,
 		const std::string& matName, const XMFLOAT4X4& texTransform,
-		const std::string& meshName, const int randerLayer);
+		const std::string& meshName, const int randerLayer,
+		const bool receiveShadow);
 
 	void UploadInstanceData();
 
-	void Draw(ID3D12GraphicsCommandList* cmdList, int randerLayer);
+	void Draw(int randerLayer);
 
 	bool Pick(FXMVECTOR rayOriginW, FXMVECTOR rayDirW);
 
 private:
-	std::shared_ptr<MeshManager> GetMeshManager();
-	std::shared_ptr<MaterialManager> GetMaterialManager();
-	std::shared_ptr<Camera> GetCamera();
+	//
 
 public:
 	std::unordered_map<std::string, std::unique_ptr<Instance>> mInstanceLayers[(int)RenderLayer::Count];
 
 private:
-	ID3D12Device* mDevice;
-	std::shared_ptr<CommonResource> mCommonResource;
+	//
 };
+
+extern std::unique_ptr<InstanceManager> gInstanceManager;

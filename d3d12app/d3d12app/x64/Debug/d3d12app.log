@@ -1,18 +1,2 @@
-﻿  D3D12App.cpp
-F:\d3d12app\d3d12app\d3d12app\D3D12App.cpp(339,27): warning C4244:  “参数”: 从“WPARAM”转换到“int”，可能丢失数据
-  Box.cpp
-  Cylinder.cpp
-  Globe.cpp
-  Grid.cpp
-  Hill.cpp
-  Skull.cpp
-  Sky.cpp
-  Sphere.cpp
-  Wave.cpp
-  WirefenceBox.cpp
-  GameObject.cpp
-  GameObjectManager.cpp
-  TheMain.cpp
-  正在生成代码...
-F:\d3d12app\d3d12app\d3d12app\D3D12App.cpp(344,25): warning C4244:  “参数”: 从“WPARAM”转换到“int”，可能丢失数据
+﻿  Wave.cpp
   d3d12app.vcxproj -> F:\d3d12app\d3d12app\x64\Debug\d3d12app.exe

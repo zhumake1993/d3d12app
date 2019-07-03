@@ -1,11 +1,16 @@
 #include "GameObjectManager.h"
 
-GameObjectManager::GameObjectManager(std::shared_ptr<CommonResource> commonResource)
+std::unique_ptr<GameObjectManager> gGameObjectManager = std::make_unique<GameObjectManager>();
+
+GameObjectManager::GameObjectManager()
 {
-	mCommonResource = commonResource;
 }
 
 GameObjectManager::~GameObjectManager()
+{
+}
+
+void GameObjectManager::Initialize()
 {
 }
 
@@ -16,23 +21,19 @@ void GameObjectManager::AddGameObject(std::unique_ptr<GameObject> gameObject)
 		return;
 	}
 
-	GetInstanceManager()->AddInstance(gameObject->mGameObjectName, gameObject->GetWorld(),
-		gameObject->mMatName, gameObject->mTexTransform, gameObject->mMeshName, gameObject->mRenderLayer);
+	gInstanceManager->AddInstance(gameObject->mGameObjectName, gameObject->GetWorld(),
+		gameObject->mMatName, gameObject->mTexTransform, gameObject->mMeshName, gameObject->mRenderLayer,
+		gameObject->mReceiveShadow);
 
 	mGameObjects[gameObject->mGameObjectName] = std::move(gameObject);
 }
 
-void GameObjectManager::Update(const GameTimer& gt)
+void GameObjectManager::Update()
 {
 	for (auto &p : mGameObjects) {
-		p.second->Update(gt);
+		p.second->Update();
 
-		GetInstanceManager()->UpdateInstance(p.second->mGameObjectName, p.second->GetWorld(),
-			p.second->mMatName, p.second->mTexTransform, p.second->mMeshName, p.second->mRenderLayer);
+		gInstanceManager->UpdateInstance(p.second->mGameObjectName, p.second->GetWorld(),
+			p.second->mMatName, p.second->mTexTransform, p.second->mMeshName, p.second->mRenderLayer, p.second->mReceiveShadow);
 	}
-}
-
-std::shared_ptr<InstanceManager> GameObjectManager::GetInstanceManager()
-{
-	return std::static_pointer_cast<InstanceManager>(mCommonResource->mInstanceManager);
 }

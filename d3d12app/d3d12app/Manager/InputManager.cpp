@@ -1,15 +1,21 @@
 #include "InputManager.h"
 
+std::unique_ptr<InputManager> gInputManager = std::make_unique<InputManager>();
+
 InputManager::InputManager()
 {
-	Clear();
 }
 
 InputManager::~InputManager()
 {
 }
 
-void InputManager::Update(const GameTimer& gt)
+void InputManager::Initialize()
+{
+	Clear();
+}
+
+void InputManager::Update()
 {
 	for (int i = 0; i < size; i++) {
 		mKeyDown[i] = false;
@@ -17,7 +23,7 @@ void InputManager::Update(const GameTimer& gt)
 	}
 }
 
-void InputManager::OnKeyDown(int key)
+void InputManager::OnKeyDown(WPARAM key)
 {
 	if (mKeyPress[key] == false) {
 		mKeyDown[key] = true;
@@ -25,23 +31,23 @@ void InputManager::OnKeyDown(int key)
 	}
 }
 
-void InputManager::OnKeyUp(int key)
+void InputManager::OnKeyUp(WPARAM key)
 {
 	mKeyUp[key] = true;
 	mKeyPress[key] = false;
 }
 
-bool InputManager::GetKeyDown(int key)
+bool InputManager::GetKeyDown(WPARAM key)
 {
 	return mKeyDown[key];
 }
 
-bool InputManager::GetKeyPress(int key)
+bool InputManager::GetKeyPress(WPARAM key)
 {
 	return mKeyPress[key];
 }
 
-bool InputManager::GetKeyUp(int key)
+bool InputManager::GetKeyUp(WPARAM key)
 {
 	return mKeyUp[key];
 }

@@ -16,11 +16,14 @@
     <Filter Include="GameObject">
       <UniqueIdentifier>{c5f86b52-bd17-4b17-8bd3-8f15e358b539}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Effect">
-      <UniqueIdentifier>{f29bb2c2-7b31-43bf-ac0e-c23ece82332c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Manager">
       <UniqueIdentifier>{84783fb6-0712-4c89-b204-6405593d4abb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render">
+      <UniqueIdentifier>{1ca43c82-25c3-4176-baf4-639fbd1db57d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Filter">
+      <UniqueIdentifier>{f29bb2c2-7b31-43bf-ac0e-c23ece82332c}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -54,6 +57,12 @@
     <FxCompile Include="Shaders\Multiply.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
+    <FxCompile Include="Shaders\Shadows.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Wireframe.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D3D12App.cpp">
@@ -83,36 +92,6 @@
     <ClCompile Include="Common\MathHelper.cpp">
       <Filter>Common</Filter>
     </ClCompile>
-    <ClCompile Include="Effect\Wireframe.cpp">
-      <Filter>Effect</Filter>
-    </ClCompile>
-    <ClCompile Include="Effect\BlurFilter.cpp">
-      <Filter>Effect</Filter>
-    </ClCompile>
-    <ClCompile Include="Effect\DrawQuad.cpp">
-      <Filter>Effect</Filter>
-    </ClCompile>
-    <ClCompile Include="Effect\RenderTarget.cpp">
-      <Filter>Effect</Filter>
-    </ClCompile>
-    <ClCompile Include="Effect\DepthComplexityUseStencil.cpp">
-      <Filter>Effect</Filter>
-    </ClCompile>
-    <ClCompile Include="Effect\DepthComplexityUseBlend.cpp">
-      <Filter>Effect</Filter>
-    </ClCompile>
-    <ClCompile Include="Effect\InverseFilter.cpp">
-      <Filter>Effect</Filter>
-    </ClCompile>
-    <ClCompile Include="Effect\SobelFilter.cpp">
-      <Filter>Effect</Filter>
-    </ClCompile>
-    <ClCompile Include="Effect\ShaderResource.cpp">
-      <Filter>Effect</Filter>
-    </ClCompile>
-    <ClCompile Include="Effect\MultiplyFilter.cpp">
-      <Filter>Effect</Filter>
-    </ClCompile>
     <ClCompile Include="Manager\Instance.cpp">
       <Filter>Manager</Filter>
     </ClCompile>
@@ -139,9 +118,6 @@
     </ClCompile>
     <ClCompile Include="GameObject\Wave.cpp">
       <Filter>GameObject</Filter>
-    </ClCompile>
-    <ClCompile Include="Effect\CubeMap.cpp">
-      <Filter>Effect</Filter>
     </ClCompile>
     <ClCompile Include="GameObject\Skull.cpp">
       <Filter>GameObject</Filter>
@@ -170,8 +146,47 @@
     <ClCompile Include="GameObject\WirefenceBox.cpp">
       <Filter>GameObject</Filter>
     </ClCompile>
-    <ClCompile Include="Manager\Manager.cpp">
-      <Filter>Manager</Filter>
+    <ClCompile Include="Common\FrameResource.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\Wireframe.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\DepthComplexityUseStencil.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\DepthComplexityUseBlend.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Filter\BlurFilter.cpp">
+      <Filter>Filter</Filter>
+    </ClCompile>
+    <ClCompile Include="Filter\InverseFilter.cpp">
+      <Filter>Filter</Filter>
+    </ClCompile>
+    <ClCompile Include="Filter\MultiplyFilter.cpp">
+      <Filter>Filter</Filter>
+    </ClCompile>
+    <ClCompile Include="Filter\SobelFilter.cpp">
+      <Filter>Filter</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\DrawQuad.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\RenderTarget.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\ShaderResource.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\ShadowMap.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\CubeMap.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\MainRender.cpp">
+      <Filter>Render</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -208,36 +223,6 @@
     <ClInclude Include="Common\UploadBuffer.h">
       <Filter>Common</Filter>
     </ClInclude>
-    <ClInclude Include="Effect\Wireframe.h">
-      <Filter>Effect</Filter>
-    </ClInclude>
-    <ClInclude Include="Effect\BlurFilter.h">
-      <Filter>Effect</Filter>
-    </ClInclude>
-    <ClInclude Include="Effect\DrawQuad.h">
-      <Filter>Effect</Filter>
-    </ClInclude>
-    <ClInclude Include="Effect\RenderTarget.h">
-      <Filter>Effect</Filter>
-    </ClInclude>
-    <ClInclude Include="Effect\DepthComplexityUseStencil.h">
-      <Filter>Effect</Filter>
-    </ClInclude>
-    <ClInclude Include="Effect\DepthComplexityUseBlend.h">
-      <Filter>Effect</Filter>
-    </ClInclude>
-    <ClInclude Include="Effect\InverseFilter.h">
-      <Filter>Effect</Filter>
-    </ClInclude>
-    <ClInclude Include="Effect\SobelFilter.h">
-      <Filter>Effect</Filter>
-    </ClInclude>
-    <ClInclude Include="Effect\ShaderResource.h">
-      <Filter>Effect</Filter>
-    </ClInclude>
-    <ClInclude Include="Effect\MultiplyFilter.h">
-      <Filter>Effect</Filter>
-    </ClInclude>
     <ClInclude Include="Manager\Instance.h">
       <Filter>Manager</Filter>
     </ClInclude>
@@ -264,9 +249,6 @@
     </ClInclude>
     <ClInclude Include="GameObject\Wave.h">
       <Filter>GameObject</Filter>
-    </ClInclude>
-    <ClInclude Include="Effect\CubeMap.h">
-      <Filter>Effect</Filter>
     </ClInclude>
     <ClInclude Include="GameObject\Skull.h">
       <Filter>GameObject</Filter>
@@ -295,8 +277,44 @@
     <ClInclude Include="GameObject\WirefenceBox.h">
       <Filter>GameObject</Filter>
     </ClInclude>
-    <ClInclude Include="Manager\Manager.h">
-      <Filter>Manager</Filter>
+    <ClInclude Include="Render\Wireframe.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\DepthComplexityUseStencil.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\DepthComplexityUseBlend.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Filter\BlurFilter.h">
+      <Filter>Filter</Filter>
+    </ClInclude>
+    <ClInclude Include="Filter\InverseFilter.h">
+      <Filter>Filter</Filter>
+    </ClInclude>
+    <ClInclude Include="Filter\MultiplyFilter.h">
+      <Filter>Filter</Filter>
+    </ClInclude>
+    <ClInclude Include="Filter\SobelFilter.h">
+      <Filter>Filter</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\DrawQuad.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\RenderTarget.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\ShaderResource.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\ShadowMap.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\CubeMap.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\MainRender.h">
+      <Filter>Render</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

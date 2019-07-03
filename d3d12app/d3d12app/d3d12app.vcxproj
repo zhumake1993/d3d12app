@@ -169,6 +169,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="Shaders\Shadows.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="Shaders\Sobel.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
@@ -187,27 +193,27 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="Shaders\Wireframe.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Common\Camera.cpp" />
     <ClCompile Include="Common\D3DApp.cpp" />
     <ClCompile Include="Common\d3dUtil.cpp" />
     <ClCompile Include="Common\DDSTextureLoader.cpp" />
+    <ClCompile Include="Common\FrameResource.cpp" />
     <ClCompile Include="Common\GameTimer.cpp" />
     <ClCompile Include="Common\GeometryGenerator.cpp" />
     <ClCompile Include="Common\MathHelper.cpp" />
     <ClCompile Include="D3D12App.cpp" />
-    <ClCompile Include="Effect\BlurFilter.cpp" />
-    <ClCompile Include="Effect\CubeMap.cpp" />
-    <ClCompile Include="Effect\DepthComplexityUseBlend.cpp" />
-    <ClCompile Include="Effect\DepthComplexityUseStencil.cpp" />
-    <ClCompile Include="Effect\DrawQuad.cpp" />
-    <ClCompile Include="Effect\InverseFilter.cpp" />
-    <ClCompile Include="Effect\MultiplyFilter.cpp" />
-    <ClCompile Include="Effect\RenderTarget.cpp" />
-    <ClCompile Include="Effect\ShaderResource.cpp" />
-    <ClCompile Include="Effect\SobelFilter.cpp" />
-    <ClCompile Include="Effect\Wireframe.cpp" />
+    <ClCompile Include="Filter\BlurFilter.cpp" />
+    <ClCompile Include="Filter\InverseFilter.cpp" />
+    <ClCompile Include="Filter\MultiplyFilter.cpp" />
+    <ClCompile Include="Filter\SobelFilter.cpp" />
     <ClCompile Include="GameObject\Box.cpp" />
     <ClCompile Include="GameObject\Cylinder.cpp" />
     <ClCompile Include="GameObject\Globe.cpp" />
@@ -223,10 +229,18 @@
     <ClCompile Include="Manager\InputManager.cpp" />
     <ClCompile Include="Manager\Instance.cpp" />
     <ClCompile Include="Manager\InstanceManager.cpp" />
-    <ClCompile Include="Manager\Manager.cpp" />
     <ClCompile Include="Manager\MaterialManager.cpp" />
     <ClCompile Include="Manager\MeshManager.cpp" />
     <ClCompile Include="Manager\TextureManager.cpp" />
+    <ClCompile Include="Render\CubeMap.cpp" />
+    <ClCompile Include="Render\DepthComplexityUseBlend.cpp" />
+    <ClCompile Include="Render\DepthComplexityUseStencil.cpp" />
+    <ClCompile Include="Render\DrawQuad.cpp" />
+    <ClCompile Include="Render\MainRender.cpp" />
+    <ClCompile Include="Render\RenderTarget.cpp" />
+    <ClCompile Include="Render\ShaderResource.cpp" />
+    <ClCompile Include="Render\ShadowMap.cpp" />
+    <ClCompile Include="Render\Wireframe.cpp" />
     <ClCompile Include="TheMain.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -241,17 +255,10 @@
     <ClInclude Include="Common\MathHelper.h" />
     <ClInclude Include="Common\UploadBuffer.h" />
     <ClInclude Include="D3D12App.h" />
-    <ClInclude Include="Effect\BlurFilter.h" />
-    <ClInclude Include="Effect\CubeMap.h" />
-    <ClInclude Include="Effect\DepthComplexityUseBlend.h" />
-    <ClInclude Include="Effect\DepthComplexityUseStencil.h" />
-    <ClInclude Include="Effect\DrawQuad.h" />
-    <ClInclude Include="Effect\InverseFilter.h" />
-    <ClInclude Include="Effect\MultiplyFilter.h" />
-    <ClInclude Include="Effect\RenderTarget.h" />
-    <ClInclude Include="Effect\ShaderResource.h" />
-    <ClInclude Include="Effect\SobelFilter.h" />
-    <ClInclude Include="Effect\Wireframe.h" />
+    <ClInclude Include="Filter\BlurFilter.h" />
+    <ClInclude Include="Filter\InverseFilter.h" />
+    <ClInclude Include="Filter\MultiplyFilter.h" />
+    <ClInclude Include="Filter\SobelFilter.h" />
     <ClInclude Include="GameObject\Box.h" />
     <ClInclude Include="GameObject\Cylinder.h" />
     <ClInclude Include="GameObject\Globe.h" />
@@ -267,10 +274,18 @@
     <ClInclude Include="Manager\InputManager.h" />
     <ClInclude Include="Manager\Instance.h" />
     <ClInclude Include="Manager\InstanceManager.h" />
-    <ClInclude Include="Manager\Manager.h" />
     <ClInclude Include="Manager\MaterialManager.h" />
     <ClInclude Include="Manager\MeshManager.h" />
     <ClInclude Include="Manager\TextureManager.h" />
+    <ClInclude Include="Render\CubeMap.h" />
+    <ClInclude Include="Render\DepthComplexityUseBlend.h" />
+    <ClInclude Include="Render\DepthComplexityUseStencil.h" />
+    <ClInclude Include="Render\DrawQuad.h" />
+    <ClInclude Include="Render\MainRender.h" />
+    <ClInclude Include="Render\RenderTarget.h" />
+    <ClInclude Include="Render\ShaderResource.h" />
+    <ClInclude Include="Render\ShadowMap.h" />
+    <ClInclude Include="Render\Wireframe.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

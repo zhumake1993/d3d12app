@@ -1,13 +1,16 @@
 #include "TextureManager.h"
 
-TextureManager::TextureManager(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, UINT CbvSrvUavDescriptorSize)
+std::unique_ptr<TextureManager> gTextureManager = std::make_unique<TextureManager>();
+
+TextureManager::TextureManager()
 {
-	mDevice = device;
-	mCmdList = cmdList;
-	mCbvSrvUavDescriptorSize = CbvSrvUavDescriptorSize;
 }
 
 TextureManager::~TextureManager()
+{
+}
+
+void TextureManager::Initialize()
 {
 }
 
@@ -60,7 +63,7 @@ void TextureManager::BuildDescriptorHeaps()
 	srvHeapDesc.NumDescriptors = mMaxNumTextures;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	ThrowIfFailed(mDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvDescriptorHeap)));
+	ThrowIfFailed(gD3D12Device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvDescriptorHeap)));
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(mSrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
@@ -72,9 +75,9 @@ void TextureManager::BuildDescriptorHeaps()
 	srvDesc.TextureCube.MipLevels = mCubeMap->Resource->GetDesc().MipLevels;
 	srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
 	srvDesc.Format = mCubeMap->Resource->GetDesc().Format;
-	mDevice->CreateShaderResourceView(mCubeMap->Resource.Get(), &srvDesc, hDescriptor);
+	gD3D12Device->CreateShaderResourceView(mCubeMap->Resource.Get(), &srvDesc, hDescriptor);
 	mCubeMap->Index = 0;
-	hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
+	hDescriptor.Offset(1, gCbvSrvUavDescriptorSize);
 
 	// 创建纹理的srv
 	UINT currIndex = 0;
@@ -86,17 +89,17 @@ void TextureManager::BuildDescriptorHeaps()
 	for (const auto& p : mTextures) {
 		srvDesc.Format = p.second->Resource->GetDesc().Format;
 		srvDesc.Texture2D.MipLevels = p.second->Resource->GetDesc().MipLevels;
-		mDevice->CreateShaderResourceView(p.second->Resource.Get(), &srvDesc, hDescriptor);
+		gD3D12Device->CreateShaderResourceView(p.second->Resource.Get(), &srvDesc, hDescriptor);
 
 		p.second->Index = currIndex++;
-		hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
+		hDescriptor.Offset(1, gCbvSrvUavDescriptorSize);
 	}
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE TextureManager::GetGpuSrvTex()
 {
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv(mSrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-	hGpuSrv.Offset(1, mCbvSrvUavDescriptorSize);
+	hGpuSrv.Offset(1, gCbvSrvUavDescriptorSize);
 	return hGpuSrv;
 }
 
@@ -118,7 +121,7 @@ void TextureManager::CreateTexture(std::unique_ptr<Texture> &tex)
 		return;
 	}
 
-	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(mDevice,
-		mCmdList, tex->FileName.c_str(),
+	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(gD3D12Device.Get(),
+		gCommandList.Get(), tex->FileName.c_str(),
 		tex->Resource, tex->UploadHeap));
 }

@@ -6,11 +6,11 @@ class Sphere :
 	public GameObject
 {
 public:
-	Sphere(std::shared_ptr<CommonResource> commonResource);
+	Sphere();
 	~Sphere();
 
 private:
-	virtual void Update(const GameTimer& gt)override;
+	virtual void Update()override;
 
 public:
 

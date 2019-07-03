@@ -1,19 +1,19 @@
 #pragma once
 
 #include "../Common/d3dUtil.h"
+#include "../Common/Camera.h"
 #include "../Common/UploadBuffer.h"
-#include "MaterialManager.h"
 #include "MeshManager.h"
 
 using namespace DirectX;
 
 struct InstanceData
 {
-	DirectX::XMFLOAT4X4 World = MathHelper::Identity4x4();
-	DirectX::XMFLOAT4X4 InverseTransposeWorld = MathHelper::Identity4x4();
-	DirectX::XMFLOAT4X4 TexTransform = MathHelper::Identity4x4();
+	XMFLOAT4X4 World = MathHelper::Identity4x4();
+	XMFLOAT4X4 InverseTransposeWorld = MathHelper::Identity4x4();
+	XMFLOAT4X4 TexTransform = MathHelper::Identity4x4();
 	UINT MaterialIndex;
-	UINT InstancePad0;
+	UINT ReceiveShadow;
 	UINT InstancePad1;
 	UINT InstancePad2;
 };
@@ -23,7 +23,7 @@ class Instance
 	friend class InstanceManager;
 
 public:
-	Instance(ID3D12Device* device, std::shared_ptr<CommonResource> commonResource);
+	Instance();
 	virtual ~Instance();
 
 	std::shared_ptr<Mesh> GetMesh();
@@ -31,19 +31,21 @@ public:
 	void CalculateBoundingBox();
 
 	void AddInstanceData(const std::string& gameObjectName, const XMFLOAT4X4& world,
-		const UINT& matIndex, const XMFLOAT4X4& texTransform);
+		const UINT& matIndex, const XMFLOAT4X4& texTransform,
+		const bool receiveShadow);
 
 	void UpdateInstanceData(const std::string& gameObjectName, const XMFLOAT4X4& world,
-		const UINT& matIndex, const XMFLOAT4X4& texTransform);
+		const UINT& matIndex, const XMFLOAT4X4& texTransform,
+		const bool receiveShadow);
 
 	void UploadInstanceData();
 
-	void Draw(ID3D12GraphicsCommandList* cmdList);
+	void Draw();
 
 	bool Pick(FXMVECTOR rayOriginW, FXMVECTOR rayDirW, std::string& name, float& tmin, XMVECTOR& point);
 
 private:
-	std::shared_ptr<Camera> GetCamera();
+	//
 
 public:
 	//
@@ -63,8 +65,4 @@ private:
 	BoundingBox mBounds;
 
 	std::unordered_map<std::string, InstanceData> mInstances;
-
-private:
-
-	std::shared_ptr<CommonResource> mCommonResource;
 };

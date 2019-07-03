@@ -7,7 +7,7 @@ class Wave :
 	public GameObject
 {
 public:
-	Wave(std::shared_ptr<CommonResource> commonResource);
+	Wave();
 	Wave(const Wave& rhs) = delete;
 	Wave& operator=(const Wave& rhs) = delete;
 	~Wave();
@@ -33,7 +33,7 @@ public:
 	void Disturb(int i, int j, float magnitude);
 
 private:
-	virtual void Update(const GameTimer& gt)override;
+	virtual void Update()override;
 
 public:
 	//

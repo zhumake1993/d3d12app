@@ -15,20 +15,16 @@ class GameObject
 	friend class GameObjectManager;
 
 public:
-	GameObject(std::shared_ptr<CommonResource> commonResource);
+	GameObject();
 	virtual ~GameObject();
 
 protected:
-	std::shared_ptr<MeshManager> GetMeshManager();
-	std::shared_ptr<InstanceManager> GetInstanceManager();
-	std::shared_ptr<MaterialManager> GetMaterialManager();
-
 	bool GetKeyDown(int key);
 	bool GetKeyPress(int key);
 	bool GetKeyUp(int key);
 
 private:
-	virtual void Update(const GameTimer& gt);
+	virtual void Update();
 
 	XMFLOAT4X4 GetWorld();
 
@@ -46,6 +42,5 @@ public:
 
 	int mRenderLayer = -1;
 
-protected:
-	std::shared_ptr<CommonResource> mCommonResource;
+	bool mReceiveShadow = true;
 };

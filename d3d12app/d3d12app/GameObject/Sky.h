@@ -6,11 +6,11 @@ class Sky :
 	public GameObject
 {
 public:
-	Sky(std::shared_ptr<CommonResource> commonResource);
+	Sky();
 	~Sky();
 
 private:
-	virtual void Update(const GameTimer& gt)override;
+	virtual void Update()override;
 
 public:
 

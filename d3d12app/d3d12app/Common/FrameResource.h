@@ -12,6 +12,7 @@ struct PassConstants
 	DirectX::XMFLOAT4X4 InvProj = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 ViewProj = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 InvViewProj = MathHelper::Identity4x4();
+	DirectX::XMFLOAT4X4 ShadowTransform = MathHelper::Identity4x4();
 	DirectX::XMFLOAT3 EyePosW = { 0.0f, 0.0f, 0.0f };
 	float cbPerObjectPad1 = 0.0f;
 	DirectX::XMFLOAT2 RenderTargetSize = { 0.0f, 0.0f };
@@ -78,6 +79,7 @@ class FrameResource
 {
 public:
 
+	FrameResource() = default;
 	FrameResource(ID3D12Device* device, UINT count, bool isConstantBuffer)
 	{
 		for (int i = 0; i < gNumFrameResources; ++i) {
@@ -87,6 +89,13 @@ public:
 	FrameResource(const FrameResource& rhs) = delete;
 	FrameResource& operator=(const FrameResource& rhs) = delete;
 	~FrameResource() {}
+
+	void Initialize(ID3D12Device* device, UINT count, bool isConstantBuffer)
+	{
+		for (int i = 0; i < gNumFrameResources; ++i) {
+			mFrameResources.push_back(std::make_unique<UploadBuffer<T>>(device, count, isConstantBuffer));
+		}
+	}
 
 	std::unique_ptr<UploadBuffer<T>>& GetCurrResource()
 	{
@@ -101,3 +110,5 @@ public:
 private:
 	std::vector<std::unique_ptr<UploadBuffer<T>>> mFrameResources; // Ö¡×ÊÔ´vector
 };
+
+extern std::unique_ptr<FrameResource<PassConstants>> gPassCB;

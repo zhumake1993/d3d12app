@@ -2,7 +2,6 @@
 
 #include "../Common/d3dUtil.h"
 #include "../Common/UploadBuffer.h"
-#include "Manager.h"
 
 using namespace DirectX;
 
@@ -20,13 +19,14 @@ struct MaterialData
 	UINT MaterialPad2;
 };
 
-class MaterialManager :
-	public Manager
+class MaterialManager
 {
 public:
 
-	MaterialManager(ID3D12Device* device);
+	MaterialManager();
 	~MaterialManager();
+
+	void Initialize();
 
 	UINT GetIndex(const std::string& name);
 
@@ -51,8 +51,6 @@ public:
 
 private:
 
-	ID3D12Device* mDevice;
-
 	UINT mMaterialDataCapacity = 100;
 	UINT mMaterialCount = 1;
 	std::vector<std::unique_ptr<UploadBuffer<MaterialData>>> mFrameResources; // 帧资源vector
@@ -61,3 +59,5 @@ private:
 	std::unordered_map<std::string, UINT> mIndices;
 	std::unordered_map<std::string, int> mNumFramesDirties; // 指示对象数据发生变化
 };
+
+extern std::unique_ptr<MaterialManager> gMaterialManager;

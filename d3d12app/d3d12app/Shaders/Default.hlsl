@@ -11,13 +11,15 @@ struct VertexIn
 struct VertexOut
 {
 	float4 PosH    : SV_POSITION;
-    float3 PosW    : POSITION;
+	float4 ShadowPosH : POSITION0;
+    float3 PosW    : POSITION1;
     float3 NormalW : NORMAL;
 	float3 TangentW : TANGENT;
 	float2 TexC    : TEXCOORD;
 
 	// nointerpolation使得索引不会被插值
 	nointerpolation uint MatIndex  : MATINDEX;
+	nointerpolation uint ReceiveShadow : RECEIVESHADOW;
 };
 
 VertexOut VS(VertexIn vin, uint instanceID : SV_InstanceID)
@@ -30,8 +32,10 @@ VertexOut VS(VertexIn vin, uint instanceID : SV_InstanceID)
 	float4x4 invTraWorld = instData.InvTraWorld;
 	float4x4 texTransform = instData.TexTransform;
 	uint matIndex = instData.MaterialIndex;
+	uint receiveShadow = instData.ReceiveShadow;
 
 	vout.MatIndex = matIndex;
+	vout.ReceiveShadow = receiveShadow;
 
 	// 获取材质数据
 	MaterialData matData = gMaterialData[matIndex];
@@ -50,6 +54,9 @@ VertexOut VS(VertexIn vin, uint instanceID : SV_InstanceID)
 
 	float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), texTransform);
 	vout.TexC = mul(texC, matData.MatTransform).xy;
+
+	// 计算投影纹理坐标
+	vout.ShadowPosH = mul(posW, gShadowTransform);
 
     return vout;
 }
@@ -91,9 +98,15 @@ float4 PS(VertexOut pin) : SV_Target
 	// 环境光
     float4 ambient = gAmbientLight* diffuseAlbedo;
 
+	// 只有第一个光源产生阴影
+	float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
+
+	if (pin.ReceiveShadow == 1) {
+		shadowFactor[0] = CalcShadowFactor(pin.ShadowPosH);
+	}
+
     const float shininess = (1.0f - roughness) * normalMapSample.a;
     Material mat = { diffuseAlbedo, fresnelR0, shininess };
-    float3 shadowFactor = 1.0f;
     float4 directLight = ComputeLighting(gLights, mat, pin.PosW,
 		bumpedNormalW, toEyeW, shadowFactor);
 

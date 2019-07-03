@@ -1,8 +1,60 @@
 #include "d3dUtil.h"
 
-using Microsoft::WRL::ComPtr;
+//===========================================================
+//===========================================================
+// 全局变量
+//===========================================================
+//===========================================================
+
+std::wstring gMainWndCaption = L"d3d12app";
+D3D_DRIVER_TYPE gd3dDriverType = D3D_DRIVER_TYPE_HARDWARE;
+DXGI_FORMAT gBackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+DXGI_FORMAT gDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+int gClientWidth = 1200;
+int gClientHeight = 900;
+
+GameTimer gTimer;
+
+ComPtr<ID3D12Device> gD3D12Device = nullptr;
+ComPtr<ID3D12GraphicsCommandList> gCommandList = nullptr;
+
+bool g4xMsaaState = false;
+UINT g4xMsaaQuality = 0;
+
+D3D12_VIEWPORT gScreenViewport;
+D3D12_RECT gScissorRect;
+
+UINT gRtvDescriptorSize = 0;
+UINT gDsvDescriptorSize = 0;
+UINT gCbvSrvUavDescriptorSize = 0;
 
 int gCurrFrameResourceIndex = 0;
+
+//===========================================================
+//===========================================================
+// 顶点、输入布局、根签名、着色器、渲染状态对象
+//===========================================================
+//===========================================================
+
+std::vector<D3D12_INPUT_ELEMENT_DESC> gInputLayout =
+{
+	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+};
+
+std::unordered_map<std::string, ComPtr<ID3D12RootSignature>> gRootSignatures;
+
+std::unordered_map<std::string, ComPtr<ID3DBlob>> gShaders;
+
+std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> gPSOs;
+
+//===========================================================
+//===========================================================
+// 辅助类
+//===========================================================
+//===========================================================
 
 ComPtr<ID3DBlob> d3dUtil::LoadBinary(const std::wstring& filename)
 {
@@ -95,7 +147,7 @@ ComPtr<ID3DBlob> d3dUtil::CompileShader(
 	return byteCode;
 }
 
-std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> d3dUtil::GetStaticSamplers()
+std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> d3dUtil::GetStaticSamplers()
 {
 	const CD3DX12_STATIC_SAMPLER_DESC pointWrap(
 		0, // shaderRegister
@@ -143,8 +195,20 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> d3dUtil::GetStaticSamplers()
 		0.0f,                              // mipLODBias
 		8);                                // maxAnisotropy
 
+	const CD3DX12_STATIC_SAMPLER_DESC shadow(
+		6, // shaderRegister
+		D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressW
+		0.0f,                               // mipLODBias
+		16,                                 // maxAnisotropy
+		D3D12_COMPARISON_FUNC_LESS_EQUAL,
+		D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK);
+
 	return {
 		pointWrap, pointClamp,
 		linearWrap, linearClamp,
-		anisotropicWrap, anisotropicClamp };
+		anisotropicWrap, anisotropicClamp,
+		shadow };
 }

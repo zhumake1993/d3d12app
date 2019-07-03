@@ -1,7 +1,7 @@
 #include "WirefenceBox.h"
 
-WirefenceBox::WirefenceBox(std::shared_ptr<CommonResource> commonResource)
-	:GameObject(commonResource)
+WirefenceBox::WirefenceBox()
+	:GameObject()
 {
 	mGameObjectName = "wirefenceBox";
 
@@ -18,6 +18,6 @@ WirefenceBox::~WirefenceBox()
 {
 }
 
-void WirefenceBox::Update(const GameTimer& gt)
+void WirefenceBox::Update()
 {
 }

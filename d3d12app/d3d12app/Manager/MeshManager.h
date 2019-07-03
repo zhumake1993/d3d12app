@@ -2,7 +2,6 @@
 
 #include "../Common/d3dUtil.h"
 #include "../Common/GeometryGenerator.h"
-#include "Manager.h"
 
 struct Mesh
 {
@@ -30,12 +29,13 @@ struct Mesh
 	D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 };
 
-class MeshManager :
-	public Manager
+class MeshManager
 {
 public:
-	MeshManager(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
+	MeshManager();
 	~MeshManager();
+
+	void Initialize();
 
 	void AddMesh(std::string Name,  GeometryGenerator::MeshData mesh);
 	void AddMesh(std::string Name, std::vector<Vertex> &vertices, std::vector<std::uint16_t> &indices);
@@ -47,6 +47,7 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Mesh>> mMeshes;
 
 private:
-	ID3D12Device* mDevice;
-	ID3D12GraphicsCommandList* mCmdList;
+	//
 };
+
+extern std::unique_ptr<MeshManager> gMeshManager;

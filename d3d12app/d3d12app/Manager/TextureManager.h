@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../Common/d3dUtil.h"
-#include "Manager.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -17,12 +16,13 @@ struct Texture
 	UINT Index;
 };
 
-class TextureManager :
-	public Manager
+class TextureManager
 {
 public:
-	TextureManager(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, UINT CbvSrvUavDescriptorSize);
+	TextureManager();
 	~TextureManager();
+
+	void Initialize();
 
 	UINT GetIndex(std::string name);
 	UINT GetCubeIndex();
@@ -42,13 +42,12 @@ public:
 	//
 
 private:
-	ID3D12Device* mDevice;
-	ID3D12GraphicsCommandList* mCmdList;
 
-	UINT mCbvSrvUavDescriptorSize;
 	ComPtr<ID3D12DescriptorHeap> mSrvDescriptorHeap = nullptr;
 
 	const UINT mMaxNumTextures = 100;
 	std::unordered_map<std::string, std::unique_ptr<Texture>> mTextures;
 	std::unique_ptr<Texture> mCubeMap;
 };
+
+extern std::unique_ptr<TextureManager> gTextureManager;

@@ -1,7 +1,7 @@
 #include "Box.h"
 
-Box::Box(std::shared_ptr<CommonResource> commonResource)
-	:GameObject(commonResource)
+Box::Box()
+	:GameObject()
 {
 	mGameObjectName = "box";
 
@@ -20,6 +20,6 @@ Box::~Box()
 {
 }
 
-void Box::Update(const GameTimer& gt)
+void Box::Update()
 {
 }

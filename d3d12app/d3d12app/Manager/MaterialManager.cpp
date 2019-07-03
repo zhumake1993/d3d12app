@@ -1,16 +1,20 @@
 #include "MaterialManager.h"
 
-MaterialManager::MaterialManager(ID3D12Device* device)
-{
-	mDevice = device;
+std::unique_ptr<MaterialManager> gMaterialManager = std::make_unique<MaterialManager>();
 
-	for (int i = 0; i < gNumFrameResources; ++i) {
-		mFrameResources.push_back(std::make_unique<UploadBuffer<MaterialData>>(device, mMaterialDataCapacity, false));
-	}
+MaterialManager::MaterialManager()
+{
 }
 
 MaterialManager::~MaterialManager()
 {
+}
+
+void MaterialManager::Initialize()
+{
+	for (int i = 0; i < gNumFrameResources; ++i) {
+		mFrameResources.push_back(std::make_unique<UploadBuffer<MaterialData>>(gD3D12Device.Get(), mMaterialDataCapacity, false));
+	}
 }
 
 UINT MaterialManager::GetIndex(const std::string& name)

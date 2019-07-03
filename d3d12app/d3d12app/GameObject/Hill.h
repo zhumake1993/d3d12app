@@ -6,11 +6,11 @@ class Hill :
 	public GameObject
 {
 public:
-	Hill(std::shared_ptr<CommonResource> commonResource);
+	Hill();
 	~Hill();
 
 private:
-	virtual void Update(const GameTimer& gt)override;
+	virtual void Update()override;
 
 public:
 
