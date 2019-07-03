@@ -10,12 +10,10 @@ MaterialManager::~MaterialManager()
 {
 }
 
-void MaterialManager::Initialize(ID3D12Device* device)
+void MaterialManager::Initialize()
 {
-	mDevice = device;
-
 	for (int i = 0; i < gNumFrameResources; ++i) {
-		mFrameResources.push_back(std::make_unique<UploadBuffer<MaterialData>>(device, mMaterialDataCapacity, false));
+		mFrameResources.push_back(std::make_unique<UploadBuffer<MaterialData>>(gD3D12Device.Get(), mMaterialDataCapacity, false));
 	}
 }
 

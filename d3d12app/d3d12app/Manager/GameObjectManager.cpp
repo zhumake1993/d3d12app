@@ -22,7 +22,8 @@ void GameObjectManager::AddGameObject(std::unique_ptr<GameObject> gameObject)
 	}
 
 	gInstanceManager->AddInstance(gameObject->mGameObjectName, gameObject->GetWorld(),
-		gameObject->mMatName, gameObject->mTexTransform, gameObject->mMeshName, gameObject->mRenderLayer);
+		gameObject->mMatName, gameObject->mTexTransform, gameObject->mMeshName, gameObject->mRenderLayer,
+		gameObject->mReceiveShadow);
 
 	mGameObjects[gameObject->mGameObjectName] = std::move(gameObject);
 }
@@ -33,6 +34,6 @@ void GameObjectManager::Update()
 		p.second->Update();
 
 		gInstanceManager->UpdateInstance(p.second->mGameObjectName, p.second->GetWorld(),
-			p.second->mMatName, p.second->mTexTransform, p.second->mMeshName, p.second->mRenderLayer);
+			p.second->mMatName, p.second->mTexTransform, p.second->mMeshName, p.second->mRenderLayer, p.second->mReceiveShadow);
 	}
 }

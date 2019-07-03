@@ -25,6 +25,8 @@ Hill::Hill()
 		v.Normal = n;
 	}
 	gMeshManager->AddMesh("hill", hill);
+
+	mReceiveShadow = false;
 }
 
 Hill::~Hill()

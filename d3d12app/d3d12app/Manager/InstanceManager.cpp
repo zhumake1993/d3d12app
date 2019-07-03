@@ -10,21 +10,21 @@ InstanceManager::~InstanceManager()
 {
 }
 
-void InstanceManager::Initialize(ID3D12Device* device)
+void InstanceManager::Initialize()
 {
-	mDevice = device;
 }
 
 void InstanceManager::AddInstance(const std::string& gameObjectName, const XMFLOAT4X4& world,
 	const std::string& matName, const XMFLOAT4X4& texTransform,
-	const std::string& meshName, const int randerLayer)
+	const std::string& meshName, const int randerLayer,
+	const bool receiveShadow)
 {
 	auto& instanceMap = mInstanceLayers[randerLayer];
 
 	if (instanceMap.find(meshName) != instanceMap.end()) {
 		// 该meshName已存在
 
-		instanceMap[meshName]->AddInstanceData(gameObjectName, world, gMaterialManager->GetIndex(matName), texTransform);
+		instanceMap[meshName]->AddInstanceData(gameObjectName, world, gMaterialManager->GetIndex(matName), texTransform, receiveShadow);
 	} else {
 		// 该meshName不存在
 
@@ -33,12 +33,12 @@ void InstanceManager::AddInstance(const std::string& gameObjectName, const XMFLO
 			return;
 		}
 
-		auto instance = std::make_unique<Instance>(mDevice);
+		auto instance = std::make_unique<Instance>();
 		instance->mMeshName = meshName;
 		instance->mMesh = gMeshManager->mMeshes[meshName];
 		instance->CalculateBoundingBox();
 
-		instance->AddInstanceData(gameObjectName, world, gMaterialManager->GetIndex(matName), texTransform);
+		instance->AddInstanceData(gameObjectName, world, gMaterialManager->GetIndex(matName), texTransform, receiveShadow);
 
 		instanceMap[meshName] = std::move(instance);
 	}
@@ -46,10 +46,11 @@ void InstanceManager::AddInstance(const std::string& gameObjectName, const XMFLO
 
 void InstanceManager::UpdateInstance(const std::string& gameObjectName, const XMFLOAT4X4& world, 
 	const std::string& matName, const XMFLOAT4X4& texTransform, 
-	const std::string& meshName, const int randerLayer)
+	const std::string& meshName, const int randerLayer,
+	const bool receiveShadow)
 {
 	auto& instanceMap = mInstanceLayers[randerLayer];
-	instanceMap[meshName]->UpdateInstanceData(gameObjectName, world, gMaterialManager->GetIndex(matName), texTransform);
+	instanceMap[meshName]->UpdateInstanceData(gameObjectName, world, gMaterialManager->GetIndex(matName), texTransform, receiveShadow);
 }
 
 void InstanceManager::UploadInstanceData()
@@ -61,10 +62,10 @@ void InstanceManager::UploadInstanceData()
 	}
 }
 
-void InstanceManager::Draw(ID3D12GraphicsCommandList* cmdList, int randerLayer)
+void InstanceManager::Draw(int randerLayer)
 {
 	for (auto& p : mInstanceLayers[randerLayer]) {
-		p.second->Draw(cmdList);
+		p.second->Draw();
 	}
 }
 

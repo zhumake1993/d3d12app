@@ -26,7 +26,7 @@ public:
 	MaterialManager();
 	~MaterialManager();
 
-	void Initialize(ID3D12Device* device);
+	void Initialize();
 
 	UINT GetIndex(const std::string& name);
 
@@ -50,8 +50,6 @@ public:
 	//
 
 private:
-
-	ID3D12Device* mDevice;
 
 	UINT mMaterialDataCapacity = 100;
 	UINT mMaterialCount = 1;

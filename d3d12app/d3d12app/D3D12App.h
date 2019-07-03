@@ -14,6 +14,7 @@
 #include "Manager/MeshManager.h"
 #include "Manager/InputManager.h"
 
+#include "Render/MainRender.h"
 #include "Render/Wireframe.h"
 #include "Render/DepthComplexityUseStencil.h"
 #include "Render/DepthComplexityUseBlend.h"
@@ -78,13 +79,11 @@ private:
 	void BuildMeshes();
 	void BuildGameObjects();
 
-	void BuildRootSignature();
-	void BuildShaders();
-	void BuildPSOs();
-
 	void Pick(int sx, int sy);
 
 private:
+
+	std::unique_ptr<MainFrameResource> mMainFrameResource; // Main帧资源
 
 	POINT mLastMousePos;
 
@@ -96,12 +95,11 @@ private:
 		XMFLOAT3(0.0f, -0.707f, -0.707f)
 	};
 
-	std::unique_ptr<MainFrameResource> mMainFrameResource; // Main帧资源
-
-
 	//
 	// Render
 	//
+
+	std::unique_ptr<MainRender> mMainRender = nullptr;
 
 	std::unique_ptr<DrawQuad> mDrawQuad = nullptr;
 	std::unique_ptr<RenderTarget> mRenderTarget = nullptr;

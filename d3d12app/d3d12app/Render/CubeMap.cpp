@@ -1,15 +1,9 @@
 #include "CubeMap.h"
 
-CubeMap::CubeMap(ID3D12Device* device,
-	ID3D12GraphicsCommandList* cmdList,
-	DXGI_FORMAT format, DXGI_FORMAT depthStencilFormat,
-	UINT cbvSrvUavDescriptorSize, UINT rtvDescriptorSize, UINT dsvDescriptorSize)
+CubeMap::CubeMap(DXGI_FORMAT format, DXGI_FORMAT depthStencilFormat)
 {
-	md3dDevice = device;
-	mCmdList = cmdList;
-
 	for (int i = 0; i < gNumFrameResources; ++i) {
-		mFrameResources.push_back(std::make_unique<UploadBuffer<PassConstants>>(device, 6, true));
+		mFrameResources.push_back(std::make_unique<UploadBuffer<PassConstants>>(gD3D12Device.Get(), 6, true));
 	}
 
 	mWidth = mCubeMapSize;
@@ -20,12 +14,14 @@ CubeMap::CubeMap(ID3D12Device* device,
 	mViewport = { 0.0f, 0.0f, (float)mWidth, (float)mHeight, 0.0f, 1.0f };
 	mScissorRect = { 0, 0, (int)mWidth, (int)mHeight };
 
-	mCbvSrvUavDescriptorSize = cbvSrvUavDescriptorSize;
-	mRtvDescriptorSize = rtvDescriptorSize;
-	mDsvDescriptorSize = dsvDescriptorSize;
+	BuildResource();
+	BuildDescriptor();
+}
 
-	BuildResources();
-	BuildDescriptors();
+void CubeMap::SetShadow(ID3D12DescriptorHeap* srvDescriptorHeapPtr, CD3DX12_GPU_DESCRIPTOR_HANDLE srv)
+{
+	mShadowSrvDescriptorHeapPtr = srvDescriptorHeapPtr;
+	mShadowSrv = srv;
 }
 
 CD3DX12_GPU_DESCRIPTOR_HANDLE CubeMap::Srv()
@@ -72,19 +68,6 @@ void CubeMap::BuildCubeFaceCamera(float x, float y, float z)
 	}
 }
 
-void CubeMap::OnResize(UINT newWidth, UINT newHeight)
-{
-	if ((mWidth != newWidth) || (mHeight != newHeight)) {
-		mWidth = newWidth;
-		mHeight = newHeight;
-
-		BuildResources();
-
-		// 新的资源，因此需要创建新的描述符
-		BuildDescriptors();
-	}
-}
-
 void CubeMap::UpdatePassConstantsData(PassConstants& mainPassCB)
 {
 	auto& uploadBuffer = mFrameResources[gCurrFrameResourceIndex];
@@ -114,12 +97,12 @@ void CubeMap::UpdatePassConstantsData(PassConstants& mainPassCB)
 	}
 }
 
-void CubeMap::DrawSceneToCubeMap(std::shared_ptr<InstanceManager> instanceManager, std::unordered_map<std::string, ComPtr<ID3D12PipelineState>>& PSOs)
+void CubeMap::DrawSceneToCubeMap()
 {
-	mCmdList->RSSetViewports(1, &mViewport);
-	mCmdList->RSSetScissorRects(1, &mScissorRect);
+	gCommandList->RSSetViewports(1, &mViewport);
+	gCommandList->RSSetScissorRects(1, &mScissorRect);
 
-	mCmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mCubeMap.Get(),
+	gCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mCubeMap.Get(),
 		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	UINT passCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
@@ -127,35 +110,57 @@ void CubeMap::DrawSceneToCubeMap(std::shared_ptr<InstanceManager> instanceManage
 	// 对于每一个立方体贴图面
 	for (int i = 0; i < 6; ++i) {
 		// 清空后缓冲和深度缓冲
-		mCmdList->ClearRenderTargetView(mhCpuRtv[i], Colors::LightSteelBlue, 0, nullptr);
-		mCmdList->ClearDepthStencilView(mhCubeDSV, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+		gCommandList->ClearRenderTargetView(mhCpuRtv[i], Colors::LightSteelBlue, 0, nullptr);
+		gCommandList->ClearDepthStencilView(mhCubeDSV, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 		// 指定渲染目标
-		mCmdList->OMSetRenderTargets(1, &mhCpuRtv[i], true, &mhCubeDSV);
+		gCommandList->OMSetRenderTargets(1, &mhCpuRtv[i], true, &mhCubeDSV);
+
+		// 设置根签名
+		gCommandList->SetGraphicsRootSignature(gRootSignatures["main"].Get());
 
 		// 绑定常量缓冲
 		auto uploadBuffer = mFrameResources[gCurrFrameResourceIndex]->Resource();
-		mCmdList->SetGraphicsRootConstantBufferView(1, uploadBuffer->GetGPUVirtualAddress() + i * passCBByteSize);
+		gCommandList->SetGraphicsRootConstantBufferView(1, uploadBuffer->GetGPUVirtualAddress() + i * passCBByteSize);
 
-		mCmdList->SetPipelineState(PSOs["opaque"].Get());
-		instanceManager->Draw(mCmdList, (int)RenderLayer::Opaque);
+		// 绑定所有材质。对于结构化缓冲，我们可以绕过堆，使用根描述符
+		auto matBuffer = gMaterialManager->CurrResource();
+		gCommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
 
-		mCmdList->SetPipelineState(PSOs["alphaTested"].Get());
-		instanceManager->Draw(mCmdList, (int)RenderLayer::AlphaTested);
+		// 绑定描述符堆
+		ID3D12DescriptorHeap* descriptorHeaps[] = { gTextureManager->GetSrvDescriptorHeapPtr() };
+		gCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-		mCmdList->SetPipelineState(PSOs["transparent"].Get());
-		instanceManager->Draw(mCmdList, (int)RenderLayer::Transparent);
+		// 绑定所有的纹理
+		gCommandList->SetGraphicsRootDescriptorTable(3, gTextureManager->GetGpuSrvTex());
 
-		mCmdList->SetPipelineState(PSOs["sky"].Get());
-		instanceManager->Draw(mCmdList, (int)RenderLayer::Sky);
+		// 绑定天空球立方体贴图
+		gCommandList->SetGraphicsRootDescriptorTable(4, gTextureManager->GetGpuSrvCube());
+
+		// 绑定阴影贴图
+		ID3D12DescriptorHeap* descriptorHeapsShadow[] = { mShadowSrvDescriptorHeapPtr };
+		gCommandList->SetDescriptorHeaps(_countof(descriptorHeapsShadow), descriptorHeapsShadow);
+		gCommandList->SetGraphicsRootDescriptorTable(5, mShadowSrv);
+
+		gCommandList->SetPipelineState(gPSOs["opaque"].Get());
+		gInstanceManager->Draw((int)RenderLayer::Opaque);
+
+		gCommandList->SetPipelineState(gPSOs["alphaTested"].Get());
+		gInstanceManager->Draw((int)RenderLayer::AlphaTested);
+
+		gCommandList->SetPipelineState(gPSOs["transparent"].Get());
+		gInstanceManager->Draw((int)RenderLayer::Transparent);
+
+		gCommandList->SetPipelineState(gPSOs["sky"].Get());
+		gInstanceManager->Draw((int)RenderLayer::Sky);
 	}
 
 	// 将资源状态改回GENERIC_READ，使得能够在着色器中读取纹理
-	mCmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mCubeMap.Get(),
+	gCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mCubeMap.Get(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
-void CubeMap::BuildResources()
+void CubeMap::BuildResource()
 {
 	D3D12_RESOURCE_DESC texDesc;
 	ZeroMemory(&texDesc, sizeof(D3D12_RESOURCE_DESC));
@@ -171,7 +176,7 @@ void CubeMap::BuildResources()
 	texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;  // 允许渲染目标
 
-	ThrowIfFailed(md3dDevice->CreateCommittedResource(
+	ThrowIfFailed(gD3D12Device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&texDesc,
@@ -180,14 +185,14 @@ void CubeMap::BuildResources()
 		IID_PPV_ARGS(&mCubeMap)));
 }
 
-void CubeMap::BuildDescriptors()
+void CubeMap::BuildDescriptor()
 {
 	// 创建SRV堆
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
 	srvHeapDesc.NumDescriptors = 1; // 暂时只有一个动态立方体贴图
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
+	ThrowIfFailed(gD3D12Device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDescriptor(mCbvSrvUavDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuDescriptor(mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
@@ -206,7 +211,7 @@ void CubeMap::BuildDescriptors()
 	srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
 
 	// 创建整个立方体贴图资源的SRV
-	md3dDevice->CreateShaderResourceView(mCubeMap.Get(), &srvDesc, mhCpuSrv);
+	gD3D12Device->CreateShaderResourceView(mCubeMap.Get(), &srvDesc, mhCpuSrv);
 
 
 
@@ -216,11 +221,11 @@ void CubeMap::BuildDescriptors()
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	rtvHeapDesc.NodeMask = 0;
-	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(
+	ThrowIfFailed(gD3D12Device->CreateDescriptorHeap(
 		&rtvHeapDesc, IID_PPV_ARGS(mRtvHeap.GetAddressOf())));
 
 	for (int i = 0; i < 6; ++i)
-		mhCpuRtv[i] = CD3DX12_CPU_DESCRIPTOR_HANDLE(mRtvHeap->GetCPUDescriptorHandleForHeapStart(), i, mRtvDescriptorSize);
+		mhCpuRtv[i] = CD3DX12_CPU_DESCRIPTOR_HANDLE(mRtvHeap->GetCPUDescriptorHandleForHeapStart(), i, gRtvDescriptorSize);
 
 	// 创建每个立方体面的RTV
 	for (int i = 0; i < 6; ++i) {
@@ -237,7 +242,7 @@ void CubeMap::BuildDescriptors()
 		rtvDesc.Texture2DArray.ArraySize = 1;
 
 		// 创建RTV
-		md3dDevice->CreateRenderTargetView(mCubeMap.Get(), &rtvDesc, mhCpuRtv[i]);
+		gD3D12Device->CreateRenderTargetView(mCubeMap.Get(), &rtvDesc, mhCpuRtv[i]);
 	}
 
 
@@ -248,10 +253,10 @@ void CubeMap::BuildDescriptors()
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	dsvHeapDesc.NodeMask = 0;
-	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(
+	ThrowIfFailed(gD3D12Device->CreateDescriptorHeap(
 		&dsvHeapDesc, IID_PPV_ARGS(mDsvHeap.GetAddressOf())));
 
-	mhCubeDSV = CD3DX12_CPU_DESCRIPTOR_HANDLE(mDsvHeap->GetCPUDescriptorHandleForHeapStart(), 0, mDsvDescriptorSize);
+	mhCubeDSV = CD3DX12_CPU_DESCRIPTOR_HANDLE(mDsvHeap->GetCPUDescriptorHandleForHeapStart(), 0, gDsvDescriptorSize);
 
 	// 创建深度模板缓冲和视图
 	D3D12_RESOURCE_DESC depthStencilDesc;
@@ -271,7 +276,7 @@ void CubeMap::BuildDescriptors()
 	optClear.Format = mDepthStencilFormat;
 	optClear.DepthStencil.Depth = 1.0f;
 	optClear.DepthStencil.Stencil = 0;
-	ThrowIfFailed(md3dDevice->CreateCommittedResource(
+	ThrowIfFailed(gD3D12Device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&depthStencilDesc,
@@ -280,5 +285,5 @@ void CubeMap::BuildDescriptors()
 		IID_PPV_ARGS(mCubeDepthStencilBuffer.GetAddressOf())));
 
 	// 创建深度模板视图
-	md3dDevice->CreateDepthStencilView(mCubeDepthStencilBuffer.Get(), nullptr, mhCubeDSV);
+	gD3D12Device->CreateDepthStencilView(mCubeDepthStencilBuffer.Get(), nullptr, mhCubeDSV);
 }

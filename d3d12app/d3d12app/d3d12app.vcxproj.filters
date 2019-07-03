@@ -185,6 +185,9 @@
     <ClCompile Include="Render\CubeMap.cpp">
       <Filter>Render</Filter>
     </ClCompile>
+    <ClCompile Include="Render\MainRender.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="D3D12App.h">
@@ -308,6 +311,9 @@
       <Filter>Render</Filter>
     </ClInclude>
     <ClInclude Include="Render\CubeMap.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\MainRender.h">
       <Filter>Render</Filter>
     </ClInclude>
   </ItemGroup>

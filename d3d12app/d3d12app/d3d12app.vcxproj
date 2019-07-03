@@ -236,6 +236,7 @@
     <ClCompile Include="Render\DepthComplexityUseBlend.cpp" />
     <ClCompile Include="Render\DepthComplexityUseStencil.cpp" />
     <ClCompile Include="Render\DrawQuad.cpp" />
+    <ClCompile Include="Render\MainRender.cpp" />
     <ClCompile Include="Render\RenderTarget.cpp" />
     <ClCompile Include="Render\ShaderResource.cpp" />
     <ClCompile Include="Render\ShadowMap.cpp" />
@@ -280,6 +281,7 @@
     <ClInclude Include="Render\DepthComplexityUseBlend.h" />
     <ClInclude Include="Render\DepthComplexityUseStencil.h" />
     <ClInclude Include="Render\DrawQuad.h" />
+    <ClInclude Include="Render\MainRender.h" />
     <ClInclude Include="Render\RenderTarget.h" />
     <ClInclude Include="Render\ShaderResource.h" />
     <ClInclude Include="Render\ShadowMap.h" />

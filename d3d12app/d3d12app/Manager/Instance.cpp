@@ -1,9 +1,9 @@
 #include "Instance.h"
 
-Instance::Instance(ID3D12Device* device)
+Instance::Instance()
 {
 	for (int i = 0; i < gNumFrameResources; ++i) {
-		mFrameResources.push_back(std::make_unique<UploadBuffer<InstanceData>>(device, mInstanceDataCapacity, false));
+		mFrameResources.push_back(std::make_unique<UploadBuffer<InstanceData>>(gD3D12Device.Get(), mInstanceDataCapacity, false));
 	}
 }
 
@@ -23,7 +23,8 @@ void Instance::CalculateBoundingBox()
 	BoundingBox::CreateFromPoints(mBounds, size, &vertices[0].Pos, sizeof(Vertex));
 }
 
-void Instance::AddInstanceData(const std::string& gameObjectName, const XMFLOAT4X4& world, const UINT& matIndex, const XMFLOAT4X4& texTransform)
+void Instance::AddInstanceData(const std::string& gameObjectName, const XMFLOAT4X4& world, const UINT& matIndex, const XMFLOAT4X4& texTransform,
+	const bool receiveShadow)
 {
 	if (mInstanceCount == mInstanceDataCapacity) {
 		// 应该进行扩容操作
@@ -39,13 +40,15 @@ void Instance::AddInstanceData(const std::string& gameObjectName, const XMFLOAT4
 	XMStoreFloat4x4(&instance.InverseTransposeWorld, inverseTransposeWorldMatrix);
 	instance.MaterialIndex = matIndex;
 	instance.TexTransform = texTransform;
+	instance.ReceiveShadow = receiveShadow ? 1 : 0;
 
 	mInstances[gameObjectName] = instance;
 
 	++mInstanceCount;
 }
 
-void Instance::UpdateInstanceData(const std::string& gameObjectName, const XMFLOAT4X4& world, const UINT& matIndex, const XMFLOAT4X4& texTransform)
+void Instance::UpdateInstanceData(const std::string& gameObjectName, const XMFLOAT4X4& world, const UINT& matIndex, const XMFLOAT4X4& texTransform,
+	const bool receiveShadow)
 {
 	mInstances[gameObjectName].World = world;
 	XMMATRIX worldMatrix = XMLoadFloat4x4(&world);
@@ -53,6 +56,7 @@ void Instance::UpdateInstanceData(const std::string& gameObjectName, const XMFLO
 	XMStoreFloat4x4(&mInstances[gameObjectName].InverseTransposeWorld, inverseTransposeWorldMatrix);
 	mInstances[gameObjectName].MaterialIndex = matIndex;
 	mInstances[gameObjectName].TexTransform = texTransform;
+	mInstances[gameObjectName].ReceiveShadow = receiveShadow ? 1 : 0;
 }
 
 void Instance::UploadInstanceData()
@@ -95,22 +99,23 @@ void Instance::UploadInstanceData()
 			XMStoreFloat4x4(&instanceData.InverseTransposeWorld, XMMatrixTranspose(inverseTransposeWorld));
 			XMStoreFloat4x4(&instanceData.TexTransform, XMMatrixTranspose(texTransform));
 			instanceData.MaterialIndex = p.second.MaterialIndex;
+			instanceData.ReceiveShadow = p.second.ReceiveShadow;
 
 			uploadBuffer->CopyData(mVisibleCount++, instanceData);
 		}
 	}
 }
 
-void Instance::Draw(ID3D12GraphicsCommandList* cmdList)
+void Instance::Draw()
 {
-	cmdList->IASetVertexBuffers(0, 1, &mMesh->VertexBufferView);
-	cmdList->IASetIndexBuffer(&mMesh->IndexBufferView);
-	cmdList->IASetPrimitiveTopology(mMesh->PrimitiveType);
+	gCommandList->IASetVertexBuffers(0, 1, &mMesh->VertexBufferView);
+	gCommandList->IASetIndexBuffer(&mMesh->IndexBufferView);
+	gCommandList->IASetPrimitiveTopology(mMesh->PrimitiveType);
 
 	auto instanceBuffer = mFrameResources[gCurrFrameResourceIndex]->Resource();
-	cmdList->SetGraphicsRootShaderResourceView(0, instanceBuffer->GetGPUVirtualAddress());
+	gCommandList->SetGraphicsRootShaderResourceView(0, instanceBuffer->GetGPUVirtualAddress());
 
-	cmdList->DrawIndexedInstanced(mMesh->IndexCount, mVisibleCount, 0, 0, 0);
+	gCommandList->DrawIndexedInstanced(mMesh->IndexCount, mVisibleCount, 0, 0, 0);
 }
 
 bool Instance::Pick(FXMVECTOR rayOriginW, FXMVECTOR rayDirW, std::string& name, float& tmin, XMVECTOR& point)

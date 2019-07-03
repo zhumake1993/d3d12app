@@ -22,7 +22,7 @@ public:
 	TextureManager();
 	~TextureManager();
 
-	void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, UINT CbvSrvUavDescriptorSize);
+	void Initialize();
 
 	UINT GetIndex(std::string name);
 	UINT GetCubeIndex();
@@ -42,10 +42,7 @@ public:
 	//
 
 private:
-	ID3D12Device* mDevice;
-	ID3D12GraphicsCommandList* mCmdList;
 
-	UINT mCbvSrvUavDescriptorSize;
 	ComPtr<ID3D12DescriptorHeap> mSrvDescriptorHeap = nullptr;
 
 	const UINT mMaxNumTextures = 100;

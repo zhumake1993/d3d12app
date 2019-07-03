@@ -19,6 +19,7 @@ struct VertexOut
 
 	// nointerpolation使得索引不会被插值
 	nointerpolation uint MatIndex  : MATINDEX;
+	nointerpolation uint ReceiveShadow : RECEIVESHADOW;
 };
 
 VertexOut VS(VertexIn vin, uint instanceID : SV_InstanceID)
@@ -31,8 +32,10 @@ VertexOut VS(VertexIn vin, uint instanceID : SV_InstanceID)
 	float4x4 invTraWorld = instData.InvTraWorld;
 	float4x4 texTransform = instData.TexTransform;
 	uint matIndex = instData.MaterialIndex;
+	uint receiveShadow = instData.ReceiveShadow;
 
 	vout.MatIndex = matIndex;
+	vout.ReceiveShadow = receiveShadow;
 
 	// 获取材质数据
 	MaterialData matData = gMaterialData[matIndex];
@@ -97,7 +100,10 @@ float4 PS(VertexOut pin) : SV_Target
 
 	// 只有第一个光源产生阴影
 	float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
-	shadowFactor[0] = CalcShadowFactor(pin.ShadowPosH);
+
+	if (pin.ReceiveShadow == 1) {
+		shadowFactor[0] = CalcShadowFactor(pin.ShadowPosH);
+	}
 
     const float shininess = (1.0f - roughness) * normalMapSample.a;
     Material mat = { diffuseAlbedo, fresnelR0, shininess };

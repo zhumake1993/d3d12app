@@ -21,7 +21,7 @@ struct InstanceData
 	float4x4 InvTraWorld;
 	float4x4 TexTransform;
 	uint     MaterialIndex;
-	uint     InstPad0;
+	uint     ReceiveShadow;
 	uint     InstPad1;
 	uint     InstPad2;
 };

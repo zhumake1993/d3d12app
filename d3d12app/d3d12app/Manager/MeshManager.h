@@ -35,7 +35,7 @@ public:
 	MeshManager();
 	~MeshManager();
 
-	void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
+	void Initialize();
 
 	void AddMesh(std::string Name,  GeometryGenerator::MeshData mesh);
 	void AddMesh(std::string Name, std::vector<Vertex> &vertices, std::vector<std::uint16_t> &indices);
@@ -47,8 +47,7 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Mesh>> mMeshes;
 
 private:
-	ID3D12Device* mDevice;
-	ID3D12GraphicsCommandList* mCmdList;
+	//
 };
 
 extern std::unique_ptr<MeshManager> gMeshManager;

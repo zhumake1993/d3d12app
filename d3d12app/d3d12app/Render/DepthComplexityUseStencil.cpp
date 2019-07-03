@@ -35,18 +35,18 @@ void DepthComplexityUseStencil::Draw(const CD3DX12_CPU_DESCRIPTOR_HANDLE& rtv, c
 	ID3D12DescriptorHeap* descriptorHeaps[] = { gTextureManager->GetSrvDescriptorHeapPtr() };
 	gCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-	// 绑定天空球立方体贴图
-	gCommandList->SetGraphicsRootDescriptorTable(3, gTextureManager->GetGpuSrvCube());
-
 	// 绑定所有的纹理
-	gCommandList->SetGraphicsRootDescriptorTable(5, gTextureManager->GetGpuSrvTex());
+	gCommandList->SetGraphicsRootDescriptorTable(3, gTextureManager->GetGpuSrvTex());
+
+	// 绑定天空球立方体贴图
+	gCommandList->SetGraphicsRootDescriptorTable(4, gTextureManager->GetGpuSrvCube());
 
 	// 计算深度复杂度
 	gCommandList->SetPipelineState(gPSOs["CountDepthComplexityUseStencil"].Get());
-	gInstanceManager->Draw(gCommandList.Get(), (int)RenderLayer::Opaque);
-	gInstanceManager->Draw(gCommandList.Get(), (int)RenderLayer::OpaqueDynamicReflectors);
-	gInstanceManager->Draw(gCommandList.Get(), (int)RenderLayer::AlphaTested);
-	gInstanceManager->Draw(gCommandList.Get(), (int)RenderLayer::Transparent);
+	gInstanceManager->Draw((int)RenderLayer::Opaque);
+	gInstanceManager->Draw((int)RenderLayer::OpaqueDynamicReflectors);
+	gInstanceManager->Draw((int)RenderLayer::AlphaTested);
+	gInstanceManager->Draw((int)RenderLayer::Transparent);
 
 	// 显示深度复杂度（使用模板缓冲）
 	gCommandList->SetGraphicsRootSignature(mRootSignature.Get());

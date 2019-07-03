@@ -22,9 +22,6 @@ bool D3D12App::Initialize()
 
 	gCamera->SetPosition(0.0f, 2.0f, -15.0f);
 
-	BuildRootSignature();
-	BuildShaders();
-
 	BuildManagers();
 	BuildRenders();
 	BuildFilters();
@@ -32,8 +29,6 @@ bool D3D12App::Initialize()
 	BuildMaterials();
 	BuildMeshes();
 	BuildGameObjects();
-
-	BuildPSOs();
 
 	// 执行初始化指令
 	ThrowIfFailed(gCommandList->Close());
@@ -85,7 +80,6 @@ void D3D12App::Update()
 	gInputManager->Update();
 	gInstanceManager->UploadInstanceData();
 
-	//
 	mShadowMap->Update(mRotatedLightDirections[0]);
 
 	UpdateFrameResource();
@@ -119,108 +113,18 @@ void D3D12App::Draw()
 		mInverseFilter->ExcuteInOut(mRenderTarget->Resource(), mRenderTarget->Resource());
 	}
 	else {
-		// 绑定描述符堆
-		ID3D12DescriptorHeap* descriptorHeaps[] = { gTextureManager->GetSrvDescriptorHeapPtr() };
-		gCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-
-		// 设置根签名
-		gCommandList->SetGraphicsRootSignature(gRootSignatures["main"].Get());
-
-		// 绑定常量缓冲
-		auto passCB = gPassCB->GetCurrResource()->Resource();
-		gCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
-
-		// 绑定所有材质。对于结构化缓冲，我们可以绕过堆，使用根描述符
-		auto matBuffer = gMaterialManager->CurrResource();
-		gCommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
-
-		// 绑定所有的纹理
-		gCommandList->SetGraphicsRootDescriptorTable(5, gTextureManager->GetGpuSrvTex());
-
-		// 绑定天空球立方体贴图
-		gCommandList->SetGraphicsRootDescriptorTable(3, gTextureManager->GetGpuSrvCube());
-
-
-
-
 		// 绘制阴影时要关闭平截头剔除
 		gCamera->mFrustumCullingEnabled = false;
-
 		mShadowMap->DrawSceneToShadowMap();
 
-		//设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
-		gCommandList->RSSetViewports(1, &gScreenViewport);
-		gCommandList->RSSetScissorRects(1, &gScissorRect);
+		// 绘制动态立方体贴图时要关闭平截头剔除
+		gCamera->mFrustumCullingEnabled = false;
+		mCubeMap->SetShadow(mShadowMap->GetSrvDescriptorHeapPtr(), mShadowMap->Srv());
+		mCubeMap->DrawSceneToCubeMap();
 
-		//清空后背缓冲和深度模板缓冲
-		gCommandList->ClearRenderTargetView(mRenderTarget->Rtv(), DirectX::Colors::Black, 0, nullptr);
-		gCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
-		//设置渲染目标
-		gCommandList->OMSetRenderTargets(1, &mRenderTarget->Rtv(), true, &DepthStencilView());
-
-		// 绑定常量缓冲
-		passCB = gPassCB->GetCurrResource()->Resource();
-		gCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
-
-		// 绑定天空球立方体贴图
-		gCommandList->SetGraphicsRootDescriptorTable(3, gTextureManager->GetGpuSrvCube());
-
-		// 绑定阴影贴图
-		ID3D12DescriptorHeap* descriptorHeapsCube[] = { mShadowMap->GetSrvDescriptorHeapPtr() };
-		gCommandList->SetDescriptorHeaps(_countof(descriptorHeapsCube), descriptorHeapsCube);
-		gCommandList->SetGraphicsRootDescriptorTable(4, mShadowMap->Srv());
-
-		//// 绘制动态立方体贴图时要关闭平截头剔除
-		//mCamera->mFrustumCullingEnabled = false;
-
-		//mCubeMap->DrawSceneToCubeMap(mInstanceManager, mPSOs);
-
-		////设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
-		//mCommandList->RSSetViewports(1, &mScreenViewport);
-		//mCommandList->RSSetScissorRects(1, &mScissorRect);
-
-		////清空后背缓冲和深度模板缓冲
-		//mCommandList->ClearRenderTargetView(mRenderTarget->Rtv(), DirectX::Colors::LightSteelBlue, 0, nullptr);
-		//mCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
-		////设置渲染目标
-		//mCommandList->OMSetRenderTargets(1, &mRenderTarget->Rtv(), true, &DepthStencilView());
-
-		//// 绑定常量缓冲
-		//auto passCB = mPassCB->GetCurrResource()->Resource();
-		//mCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
-
-		//// 使用动态立方体贴图绘制动态反射物体
-
-		//// 绑定动态立方体贴图的描述符堆
-		//ID3D12DescriptorHeap* descriptorHeapsCube[] = { mCubeMap->GetSrvDescriptorHeapPtr() };
-		//mCommandList->SetDescriptorHeaps(_countof(descriptorHeapsCube), descriptorHeapsCube);
-
-		//mCommandList->SetGraphicsRootDescriptorTable(3, mCubeMap->Srv());
-
-		//mCommandList->SetPipelineState(mPSOs["opaque"].Get());
-		//mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::OpaqueDynamicReflectors);
-
-		//// 使用静态立方体贴图绘制动态其他物体
-
-		//// 绑定纹理的描述符堆
-		//ID3D12DescriptorHeap* descriptorHeapsTex[] = { mTextureManager->GetSrvDescriptorHeapPtr() };
-		//mCommandList->SetDescriptorHeaps(_countof(descriptorHeapsTex), descriptorHeapsTex);
-
-		//mCommandList->SetGraphicsRootDescriptorTable(3, mTextureManager->GetGpuSrvCube());
-
-		gCommandList->SetPipelineState(gPSOs["opaque"].Get());
-		gInstanceManager->Draw(gCommandList.Get(), (int)RenderLayer::Opaque);
-
-		gCommandList->SetPipelineState(gPSOs["alphaTested"].Get());
-		gInstanceManager->Draw(gCommandList.Get(), (int)RenderLayer::AlphaTested);
-
-		gCommandList->SetPipelineState(gPSOs["transparent"].Get());
-		gInstanceManager->Draw(gCommandList.Get(), (int)RenderLayer::Transparent);
-
-		gCommandList->SetPipelineState(gPSOs["sky"].Get());
-		gInstanceManager->Draw(gCommandList.Get(), (int)RenderLayer::Sky);
+		mMainRender->SetShadow(mShadowMap->GetSrvDescriptorHeapPtr(), mShadowMap->Srv());
+		mMainRender->SetCubeMap(mCubeMap->GetSrvDescriptorHeapPtr(), mCubeMap->Srv());
+		mMainRender->Draw(mRenderTarget->Rtv(), DepthStencilView());
 	}
 
 	//
@@ -408,16 +312,18 @@ void D3D12App::UpdateFrameResource()
 
 void D3D12App::BuildManagers()
 {
-	gTextureManager->Initialize(gD3D12Device.Get(), gCommandList.Get(), gCbvSrvUavDescriptorSize);
-	gMaterialManager->Initialize(gD3D12Device.Get());
-	gMeshManager->Initialize(gD3D12Device.Get(), gCommandList.Get());
-	gInstanceManager->Initialize(gD3D12Device.Get());
+	gTextureManager->Initialize();
+	gMaterialManager->Initialize();
+	gMeshManager->Initialize();
+	gInstanceManager->Initialize();
 	gGameObjectManager->Initialize();
 	gInputManager->Initialize();
 }
 
 void D3D12App::BuildRenders()
 {
+	mMainRender = std::make_unique<MainRender>();
+
 	mDrawQuad = std::make_unique<DrawQuad>(gClientWidth, gClientHeight, gBackBufferFormat);
 	mRenderTarget = std::make_unique<RenderTarget>(gClientWidth, gClientHeight, gBackBufferFormat);
 	mShaderResourceTemp = std::make_unique<ShaderResource>(gClientWidth, gClientHeight, gBackBufferFormat);
@@ -425,6 +331,17 @@ void D3D12App::BuildRenders()
 	mWireframe = std::make_unique<Wireframe>();
 	mDepthComplexityUseStencil = std::make_unique<DepthComplexityUseStencil>();
 	mDepthComplexityUseBlend = std::make_unique<DepthComplexityUseBlend>();
+
+	mCubeMap = std::make_unique<CubeMap>(DXGI_FORMAT_R8G8B8A8_UNORM, gDepthStencilFormat);
+	mCubeMap->BuildCubeFaceCamera(0.0f, 2.0f, 0.0f);
+
+	mShadowMap = std::make_unique<ShadowMap>(2048, 2048);
+	// 手动设置场景的包围球
+	// 通常需要迭代所有的顶点来计算包围球
+	BoundingSphere sceneBounds;
+	sceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	sceneBounds.Radius = sqrtf(10.0f * 10.0f + 15.0f * 15.0f);
+	mShadowMap->SetBoundingSphere(sceneBounds);
 }
 
 void D3D12App::BuildFilters()
@@ -433,20 +350,6 @@ void D3D12App::BuildFilters()
 	mSobelFilter = std::make_unique<SobelFilter>(gClientWidth, gClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
 	mInverseFilter = std::make_unique<InverseFilter>(gClientWidth, gClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
 	mMultiplyFilter = std::make_unique<MultiplyFilter>(gClientWidth, gClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
-
-	mCubeMap = std::make_unique<CubeMap>(gD3D12Device.Get(), gCommandList.Get(),
-		DXGI_FORMAT_R8G8B8A8_UNORM, gDepthStencilFormat,
-		gCbvSrvUavDescriptorSize, gRtvDescriptorSize, gDsvDescriptorSize);
-	mCubeMap->BuildCubeFaceCamera(0.0f, 2.0f, 0.0f);
-
-	mShadowMap = std::make_unique<ShadowMap>(gD3D12Device.Get(), gCommandList.Get(), 2048, 2048);
-	// 手动设置场景的包围球
-	// 通常需要迭代所有的顶点来计算包围球
-	BoundingSphere sceneBounds;
-	sceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
-	sceneBounds.Radius = sqrtf(10.0f * 10.0f + 15.0f * 15.0f);
-	mShadowMap->SetBoundingSphere(sceneBounds);
-
 }
 
 void D3D12App::BuildTextures()
@@ -534,7 +437,7 @@ void D3D12App::BuildMaterials()
 	grass.NormalMapIndex = -1;
 	grass.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	grass.FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
-	grass.Roughness = 0.125f;
+	grass.Roughness = 0.925f;
 	gMaterialManager->AddMaterial("grass", grass);
 
 	MaterialData water;
@@ -628,165 +531,6 @@ void D3D12App::BuildGameObjects()
 
 	auto skull = std::make_unique<Skull>();
 	gGameObjectManager->AddGameObject(std::move(skull));
-}
-
-void D3D12App::BuildRootSignature()
-{
-	CD3DX12_DESCRIPTOR_RANGE texCubeMap;
-	texCubeMap.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
-
-	CD3DX12_DESCRIPTOR_RANGE texShadowMap;
-	texShadowMap.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
-
-	CD3DX12_DESCRIPTOR_RANGE texTable;
-	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, gTextureManager->GetMaxNumTextures(), 2, 0);
-
-	CD3DX12_ROOT_PARAMETER slotRootParameter[6];
-
-	slotRootParameter[0].InitAsShaderResourceView(0, 1); // 结构化缓冲InstanceData
-	slotRootParameter[1].InitAsConstantBufferView(1); // 常量缓冲PassConstants
-	slotRootParameter[2].InitAsShaderResourceView(1, 1); // 结构化缓冲MaterialData
-	slotRootParameter[3].InitAsDescriptorTable(1, &texCubeMap, D3D12_SHADER_VISIBILITY_PIXEL); // 立方体贴图
-	slotRootParameter[4].InitAsDescriptorTable(1, &texShadowMap, D3D12_SHADER_VISIBILITY_PIXEL); // 阴影贴图
-	slotRootParameter[5].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL); // 纹理
-
-	auto staticSamplers = d3dUtil::GetStaticSamplers();
-
-	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(_countof(slotRootParameter), slotRootParameter,
-		(UINT)staticSamplers.size(), staticSamplers.data(),
-		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-	ComPtr<ID3DBlob> serializedRootSig = nullptr;
-	ComPtr<ID3DBlob> errorBlob = nullptr;
-	HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
-		serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
-
-	if (errorBlob != nullptr) {
-		::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
-	}
-	ThrowIfFailed(hr);
-
-	ThrowIfFailed(gD3D12Device->CreateRootSignature(
-		0,
-		serializedRootSig->GetBufferPointer(),
-		serializedRootSig->GetBufferSize(),
-		IID_PPV_ARGS(gRootSignatures["main"].GetAddressOf())));
-}
-
-void D3D12App::BuildShaders()
-{
-	const D3D_SHADER_MACRO defines[] =
-	{
-		"FOG", "1",
-		NULL, NULL
-	};
-
-	const D3D_SHADER_MACRO alphaTestDefines[] =
-	{
-		"FOG", "1",
-		"ALPHA_TEST", "1",
-		NULL, NULL
-	};
-
-	gShaders["standardVS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", nullptr, "VS", "vs_5_1");
-	gShaders["opaquePS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", defines, "PS", "ps_5_1");
-	gShaders["alphaTestedPS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
-
-	gShaders["UIVS"] = d3dUtil::CompileShader(L"Shaders\\UI.hlsl", nullptr, "VS", "vs_5_1");
-	gShaders["UIPS"] = d3dUtil::CompileShader(L"Shaders\\UI.hlsl", nullptr, "PS", "ps_5_1");
-
-	gShaders["skyVS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "VS", "vs_5_1");
-	gShaders["skyPS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "PS", "ps_5_1");
-}
-
-void D3D12App::BuildPSOs()
-{
-	//
-	// 不透明物体的PSO
-	//
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
-	ZeroMemory(&opaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
-	opaquePsoDesc.InputLayout = { gInputLayout.data(), (UINT)gInputLayout.size() };
-	opaquePsoDesc.pRootSignature = gRootSignatures["main"].Get();
-	opaquePsoDesc.VS =
-	{
-		reinterpret_cast<BYTE*>(gShaders["standardVS"]->GetBufferPointer()),
-		gShaders["standardVS"]->GetBufferSize()
-	};
-	opaquePsoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(gShaders["opaquePS"]->GetBufferPointer()),
-		gShaders["opaquePS"]->GetBufferSize()
-	};
-	opaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	opaquePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	opaquePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-	opaquePsoDesc.SampleMask = UINT_MAX;
-	opaquePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	opaquePsoDesc.NumRenderTargets = 1;
-	opaquePsoDesc.RTVFormats[0] = gBackBufferFormat;
-	opaquePsoDesc.SampleDesc.Count = g4xMsaaState ? 4 : 1;
-	opaquePsoDesc.SampleDesc.Quality = g4xMsaaState ? (g4xMsaaQuality - 1) : 0;
-	opaquePsoDesc.DSVFormat = gDepthStencilFormat;
-	ThrowIfFailed(gD3D12Device->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&gPSOs["opaque"])));
-
-	//
-	// 透明物体
-	//
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPsoDesc = opaquePsoDesc;
-
-	D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
-	transparencyBlendDesc.BlendEnable = true;
-	transparencyBlendDesc.LogicOpEnable = false;
-	transparencyBlendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
-	transparencyBlendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-	transparencyBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
-	transparencyBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
-	transparencyBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
-	transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
-	transparencyBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
-	transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-
-	transparentPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
-	ThrowIfFailed(gD3D12Device->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&gPSOs["transparent"])));
-
-	//
-	// alpha测试物体
-	//
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC alphaTestedPsoDesc = opaquePsoDesc;
-	alphaTestedPsoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(gShaders["alphaTestedPS"]->GetBufferPointer()),
-		gShaders["alphaTestedPS"]->GetBufferSize()
-	};
-	alphaTestedPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-	ThrowIfFailed(gD3D12Device->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(&gPSOs["alphaTested"])));
-
-	mShadowMap->SetPSODesc(opaquePsoDesc);
-
-	//
-	// 天空球
-	//
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC skyPsoDesc = opaquePsoDesc;
-
-	// 摄像机在天空球内部，因此关闭背部剔除
-	skyPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-
-	// 将深度函数从LESS改为LESS_EQUAL
-	// 否则，如果深度缓冲被清空为1，那么深度值z = 1的天空球将不会通过深度测试
-	skyPsoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-	skyPsoDesc.pRootSignature = gRootSignatures["main"].Get();
-	skyPsoDesc.VS =
-	{
-		reinterpret_cast<BYTE*>(gShaders["skyVS"]->GetBufferPointer()),
-		gShaders["skyVS"]->GetBufferSize()
-	};
-	skyPsoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(gShaders["skyPS"]->GetBufferPointer()),
-		gShaders["skyPS"]->GetBufferSize()
-	};
-	ThrowIfFailed(gD3D12Device->CreateGraphicsPipelineState(&skyPsoDesc, IID_PPV_ARGS(&gPSOs["sky"])));
 }
 
 void D3D12App::Pick(int sx, int sy)

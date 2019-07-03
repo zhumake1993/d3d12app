@@ -14,10 +14,8 @@ MeshManager::~MeshManager()
 	}
 }
 
-void MeshManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
+void MeshManager::Initialize()
 {
-	mDevice = device;
-	mCmdList = cmdList;
 }
 
 void MeshManager::AddMesh(std::string Name, GeometryGenerator::MeshData mesh)
@@ -57,11 +55,11 @@ void MeshManager::AddMesh(std::string Name, std::vector<Vertex>& vertices, std::
 	ThrowIfFailed(D3DCreateBlob(ibByteSize, &meshGeo->IndexBufferCPU));
 	CopyMemory(meshGeo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
 
-	meshGeo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(mDevice,
-		mCmdList, vertices.data(), vbByteSize, meshGeo->VertexBufferUploader);
+	meshGeo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(gD3D12Device.Get(),
+		gCommandList.Get(), vertices.data(), vbByteSize, meshGeo->VertexBufferUploader);
 
-	meshGeo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(mDevice,
-		mCmdList, indices.data(), ibByteSize, meshGeo->IndexBufferUploader);
+	meshGeo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(gD3D12Device.Get(),
+		gCommandList.Get(), indices.data(), ibByteSize, meshGeo->IndexBufferUploader);
 
 	meshGeo->VertexByteStride = sizeof(Vertex);
 	meshGeo->VertexBufferByteSize = vbByteSize;

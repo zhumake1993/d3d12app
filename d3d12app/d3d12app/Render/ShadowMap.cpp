@@ -1,14 +1,9 @@
 #include "ShadowMap.h"
 
-ShadowMap::ShadowMap(ID3D12Device* device,
-	ID3D12GraphicsCommandList* cmdList,
-	UINT width, UINT height)
+ShadowMap::ShadowMap(UINT width, UINT height)
 {
-	md3dDevice = device;
-	mCmdList = cmdList;
-
 	for (int i = 0; i < gNumFrameResources; ++i) {
-		mFrameResources.push_back(std::make_unique<UploadBuffer<PassConstants>>(device, 1, true));
+		mFrameResources.push_back(std::make_unique<UploadBuffer<PassConstants>>(gD3D12Device.Get(), 1, true));
 	}
 
 	mWidth = width;
@@ -17,10 +12,11 @@ ShadowMap::ShadowMap(ID3D12Device* device,
 	mViewport = { 0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f };
 	mScissorRect = { 0, 0, (int)width, (int)height };
 
-	BuildResources();
+	BuildResource();
 	BuildRootSignature();
-	BuildDescriptors();
+	BuildDescriptor();
 	BuildShader();
+	BuildPSO();
 }
 
 void ShadowMap::SetBoundingSphere(BoundingSphere sceneBounds)
@@ -41,19 +37,6 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE ShadowMap::Srv()
 ID3D12DescriptorHeap* ShadowMap::GetSrvDescriptorHeapPtr()
 {
 	return mCbvSrvUavDescriptorHeap.Get();;
-}
-
-void ShadowMap::OnResize(UINT newWidth, UINT newHeight)
-{
-	if ((mWidth != newWidth) || (mHeight != newHeight)) {
-		mWidth = newWidth;
-		mHeight = newHeight;
-
-		BuildResources();
-
-		// 新的资源，因此需要创建新的描述符
-		BuildDescriptors();
-	}
 }
 
 void ShadowMap::Update(XMFLOAT3 mRotatedLightDirection)
@@ -120,49 +103,58 @@ void ShadowMap::Update(XMFLOAT3 mRotatedLightDirection)
 	uploadBuffer->CopyData(0, mShadowPassCB);
 }
 
-void ShadowMap::SetPSODesc(D3D12_GRAPHICS_PIPELINE_STATE_DESC& opaquePsoDesc)
-{
-	mOpaquePsoDesc = opaquePsoDesc;
-	BuildPSOs();
-}
-
 void ShadowMap::DrawSceneToShadowMap()
 {
-	mCmdList->RSSetViewports(1, &mViewport);
-	mCmdList->RSSetScissorRects(1, &mScissorRect);
-
 	// 转换至DEPTH_WRITE.
-	mCmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap.Get(),
+	// 注意放在ClearDepthStencilView的前面，否则会报状态转换的错误
+	gCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap.Get(),
 		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
+	//设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
+	gCommandList->RSSetViewports(1, &mViewport);
+	gCommandList->RSSetScissorRects(1, &mScissorRect);
+
 	// 清空缓冲
-	mCmdList->ClearDepthStencilView(mhCpuDsv,
-		D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+	gCommandList->ClearDepthStencilView(mhCpuDsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 	// 指定空渲染目标，因为只绘制深度缓冲
 	// 设置空渲染目标会关闭颜色写
 	// 对应的PSO必须同时指定渲染目标的数量为0
-	mCmdList->OMSetRenderTargets(0, nullptr, false, &mhCpuDsv);
+	gCommandList->OMSetRenderTargets(0, nullptr, false, &mhCpuDsv);
+
+	// 设置根签名
+	gCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
 	// 绑定常量缓冲
 	auto uploadBuffer = mFrameResources[gCurrFrameResourceIndex]->Resource();
-	mCmdList->SetGraphicsRootConstantBufferView(1, uploadBuffer->GetGPUVirtualAddress());
+	gCommandList->SetGraphicsRootConstantBufferView(1, uploadBuffer->GetGPUVirtualAddress());
 
-	mCmdList->SetPipelineState(mPSO.Get());
-	gInstanceManager->Draw(mCmdList, (int)RenderLayer::Opaque);
+	// 绑定所有材质。对于结构化缓冲，我们可以绕过堆，使用根描述符
+	auto matBuffer = gMaterialManager->CurrResource();
+	gCommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
 
-	//mCmdList->SetPipelineState(PSOs["alphaTested"].Get());
-	//instanceManager->Draw(mCmdList, (int)RenderLayer::AlphaTested);
+	// 绑定描述符堆
+	ID3D12DescriptorHeap* descriptorHeaps[] = { gTextureManager->GetSrvDescriptorHeapPtr() };
+	gCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-	//mCmdList->SetPipelineState(PSOs["transparent"].Get());
-	//instanceManager->Draw(mCmdList, (int)RenderLayer::Transparent);
+	// 绑定所有的纹理
+	gCommandList->SetGraphicsRootDescriptorTable(3, gTextureManager->GetGpuSrvTex());
+
+	// 绑定天空球立方体贴图
+	gCommandList->SetGraphicsRootDescriptorTable(4, gTextureManager->GetGpuSrvCube());
+
+	gCommandList->SetPipelineState(gPSOs["Shadow"].Get());
+	gInstanceManager->Draw((int)RenderLayer::Opaque);
+	gInstanceManager->Draw((int)RenderLayer::AlphaTested);
+	gInstanceManager->Draw((int)RenderLayer::Transparent);
+	gInstanceManager->Draw((int)RenderLayer::OpaqueDynamicReflectors);
 
 	// 转换回GENERIC_READ，使得能够在着色器中读取该纹理
-	mCmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap.Get(),
+	gCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap.Get(),
 		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
-void ShadowMap::BuildResources()
+void ShadowMap::BuildResource()
 {
 	D3D12_RESOURCE_DESC texDesc;
 	ZeroMemory(&texDesc, sizeof(D3D12_RESOURCE_DESC));
@@ -183,7 +175,7 @@ void ShadowMap::BuildResources()
 	optClear.DepthStencil.Depth = 1.0f;
 	optClear.DepthStencil.Stencil = 0;
 
-	ThrowIfFailed(md3dDevice->CreateCommittedResource(
+	ThrowIfFailed(gD3D12Device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&texDesc,
@@ -194,17 +186,17 @@ void ShadowMap::BuildResources()
 
 void ShadowMap::BuildRootSignature()
 {
-
+	mRootSignature = gRootSignatures["main"];
 }
 
-void ShadowMap::BuildDescriptors()
+void ShadowMap::BuildDescriptor()
 {
 	// 创建SRV堆
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
 	srvHeapDesc.NumDescriptors = 1;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
+	ThrowIfFailed(gD3D12Device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mCbvSrvUavDescriptorHeap)));
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuDescriptor(mCbvSrvUavDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 	CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuDescriptor(mCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
@@ -222,7 +214,7 @@ void ShadowMap::BuildDescriptors()
 	srvDesc.Texture2D.MipLevels = 1;
 	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 	srvDesc.Texture2D.PlaneSlice = 0;
-	md3dDevice->CreateShaderResourceView(mShadowMap.Get(), &srvDesc, mhCpuSrv);
+	gD3D12Device->CreateShaderResourceView(mShadowMap.Get(), &srvDesc, mhCpuSrv);
 
 
 
@@ -232,10 +224,10 @@ void ShadowMap::BuildDescriptors()
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	dsvHeapDesc.NodeMask = 0;
-	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(
+	ThrowIfFailed(gD3D12Device->CreateDescriptorHeap(
 		&dsvHeapDesc, IID_PPV_ARGS(mDsvHeap.GetAddressOf())));
 
-	mhCpuDsv = CD3DX12_CPU_DESCRIPTOR_HANDLE(mDsvHeap->GetCPUDescriptorHandleForHeapStart(), 0, mDsvDescriptorSize);
+	mhCpuDsv = CD3DX12_CPU_DESCRIPTOR_HANDLE(mDsvHeap->GetCPUDescriptorHandleForHeapStart(), 0, gDsvDescriptorSize);
 
 	// 创建DSV，以便渲染到阴影贴图
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
@@ -243,7 +235,7 @@ void ShadowMap::BuildDescriptors()
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	dsvDesc.Texture2D.MipSlice = 0;
-	md3dDevice->CreateDepthStencilView(mShadowMap.Get(), &dsvDesc, mhCpuDsv);
+	gD3D12Device->CreateDepthStencilView(mShadowMap.Get(), &dsvDesc, mhCpuDsv);
 }
 
 void ShadowMap::BuildShader()
@@ -254,31 +246,46 @@ void ShadowMap::BuildShader()
 		NULL, NULL
 	};
 
-	mShadowVS = d3dUtil::CompileShader(L"Shaders\\Shadows.hlsl", nullptr, "VS", "vs_5_1");
-	mShadowPS = d3dUtil::CompileShader(L"Shaders\\Shadows.hlsl", nullptr, "PS", "ps_5_1");
-	mShadowAlphaTestedPS = d3dUtil::CompileShader(L"Shaders\\Shadows.hlsl", alphaTestDefines, "PS", "ps_5_1");
+	gShaders["ShadowVS"] = d3dUtil::CompileShader(L"Shaders\\Shadows.hlsl", nullptr, "VS", "vs_5_1");
+	gShaders["ShadowPS"] = d3dUtil::CompileShader(L"Shaders\\Shadows.hlsl", nullptr, "PS", "ps_5_1");
+	gShaders["ShadowAlphaTestedPS"] = d3dUtil::CompileShader(L"Shaders\\Shadows.hlsl", alphaTestDefines, "PS", "ps_5_1");
 }
 
-void ShadowMap::BuildPSOs()
+void ShadowMap::BuildPSO()
 {
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC smapPsoDesc = mOpaquePsoDesc;
-	smapPsoDesc.RasterizerState.DepthBias = 100000;
-	smapPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
-	smapPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
-	//smapPsoDesc.pRootSignature = mRootSignature.Get();
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC smapPsoDesc;
+	ZeroMemory(&smapPsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+	smapPsoDesc.InputLayout = { gInputLayout.data(), (UINT)gInputLayout.size() };
+	smapPsoDesc.pRootSignature = mRootSignature.Get();
 	smapPsoDesc.VS =
 	{
-		reinterpret_cast<BYTE*>(mShadowVS->GetBufferPointer()),
-		mShadowVS->GetBufferSize()
+		reinterpret_cast<BYTE*>(gShaders["ShadowVS"]->GetBufferPointer()),
+		gShaders["ShadowVS"]->GetBufferSize()
 	};
 	smapPsoDesc.PS =
 	{
-		reinterpret_cast<BYTE*>(mShadowPS->GetBufferPointer()),
-		mShadowPS->GetBufferSize()
+		reinterpret_cast<BYTE*>(gShaders["ShadowAlphaTestedPS"]->GetBufferPointer()),
+		gShaders["ShadowAlphaTestedPS"]->GetBufferSize()
 	};
+	smapPsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+
+	// 偏移
+	smapPsoDesc.RasterizerState.DepthBias = 100000;
+	smapPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
+	smapPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+
+	smapPsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	smapPsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+	smapPsoDesc.SampleMask = UINT_MAX;
+	smapPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
 	// 绘制阴影贴图不需要渲染目标
 	smapPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
 	smapPsoDesc.NumRenderTargets = 0;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&smapPsoDesc, IID_PPV_ARGS(&mPSO)));
+
+	smapPsoDesc.SampleDesc.Count = g4xMsaaState ? 4 : 1;
+	smapPsoDesc.SampleDesc.Quality = g4xMsaaState ? (g4xMsaaQuality - 1) : 0;
+	smapPsoDesc.DSVFormat = gDepthStencilFormat;
+
+	ThrowIfFailed(gD3D12Device->CreateGraphicsPipelineState(&smapPsoDesc, IID_PPV_ARGS(&gPSOs["Shadow"])));
 }

@@ -41,4 +41,6 @@ public:
 	std::string mMeshName;
 
 	int mRenderLayer = -1;
+
+	bool mReceiveShadow = true;
 };

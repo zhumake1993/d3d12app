@@ -3,8 +3,7 @@
 #include "../Common/d3dUtil.h"
 #include "../Common/FrameResource.h"
 #include "../Manager/InstanceManager.h"
-
-using Microsoft::WRL::ComPtr;
+#include "../Manager/TextureManager.h"
 
 enum class CubeMapFace : int
 {
@@ -19,35 +18,29 @@ enum class CubeMapFace : int
 class CubeMap
 {
 public:
-	CubeMap(ID3D12Device* device,
-		ID3D12GraphicsCommandList* cmdList,
-		DXGI_FORMAT format, DXGI_FORMAT mDepthStencilFormat,
-		UINT cbvSrvUavDescriptorSize, UINT rtvDescriptorSize, UINT dsvDescriptorSize);
+	CubeMap(DXGI_FORMAT format, DXGI_FORMAT depthStencilFormat);
 
 	CubeMap(const CubeMap& rhs) = delete;
 	CubeMap& operator=(const CubeMap& rhs) = delete;
 	~CubeMap() = default;
+
+	void SetShadow(ID3D12DescriptorHeap* srvDescriptorHeapPtr, CD3DX12_GPU_DESCRIPTOR_HANDLE srv);
 
 	CD3DX12_GPU_DESCRIPTOR_HANDLE Srv();
 	ID3D12DescriptorHeap* GetSrvDescriptorHeapPtr();
 
 	void BuildCubeFaceCamera(float x, float y, float z);
 
-	void OnResize(UINT newWidth, UINT newHeight);
-
 	void UpdatePassConstantsData(PassConstants& mainPassCB);
 
-	void DrawSceneToCubeMap(std::shared_ptr<InstanceManager> instanceManager, std::unordered_map<std::string, ComPtr<ID3D12PipelineState>>& PSOs);
+	void DrawSceneToCubeMap();
 
 private:
-	void BuildResources();
-	void BuildDescriptors();
+	void BuildResource();
+	void BuildDescriptor();
 
 private:
 	const UINT mCubeMapSize = 512;
-
-	ID3D12Device* md3dDevice = nullptr;
-	ID3D12GraphicsCommandList* mCmdList = nullptr;
 
 	D3D12_VIEWPORT mViewport;
 	D3D12_RECT mScissorRect;
@@ -55,9 +48,6 @@ private:
 	ComPtr<ID3D12DescriptorHeap> mCbvSrvUavDescriptorHeap = nullptr;
 	ComPtr<ID3D12DescriptorHeap> mRtvHeap = nullptr;
 	ComPtr<ID3D12DescriptorHeap> mDsvHeap = nullptr;
-	UINT mCbvSrvUavDescriptorSize;
-	UINT mRtvDescriptorSize;
-	UINT mDsvDescriptorSize;
 
 	UINT mWidth = 0;
 	UINT mHeight = 0;
@@ -75,4 +65,7 @@ private:
 	Camera mCubeMapCamera[6];
 
 	std::vector<std::unique_ptr<UploadBuffer<PassConstants>>> mFrameResources; // Ö¡×ÊÔ´vector
+
+	ID3D12DescriptorHeap* mShadowSrvDescriptorHeapPtr;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE mShadowSrv;
 };

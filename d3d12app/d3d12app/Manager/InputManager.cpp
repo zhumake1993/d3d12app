@@ -4,7 +4,6 @@ std::unique_ptr<InputManager> gInputManager = std::make_unique<InputManager>();
 
 InputManager::InputManager()
 {
-	Clear();
 }
 
 InputManager::~InputManager()
@@ -13,6 +12,7 @@ InputManager::~InputManager()
 
 void InputManager::Initialize()
 {
+	Clear();
 }
 
 void InputManager::Update()

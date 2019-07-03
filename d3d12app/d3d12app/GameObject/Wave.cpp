@@ -90,6 +90,8 @@ Wave::Wave()
 		}
 		gMeshManager->AddMesh("wave", vertices, indices);
 	}
+
+	mReceiveShadow = false;
 }
 
 Wave::~Wave()

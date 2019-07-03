@@ -11,19 +11,21 @@ public:
 	InstanceManager();
 	~InstanceManager();
 
-	void Initialize(ID3D12Device* device);
+	void Initialize();
 
 	void AddInstance(const std::string& gameObjectName, const XMFLOAT4X4& world,
 		const std::string& matName, const XMFLOAT4X4& texTransform,
-		const std::string& meshName, const int randerLayer);
+		const std::string& meshName, const int randerLayer,
+		const bool receiveShadow);
 
 	void UpdateInstance(const std::string& gameObjectName, const XMFLOAT4X4& world,
 		const std::string& matName, const XMFLOAT4X4& texTransform,
-		const std::string& meshName, const int randerLayer);
+		const std::string& meshName, const int randerLayer,
+		const bool receiveShadow);
 
 	void UploadInstanceData();
 
-	void Draw(ID3D12GraphicsCommandList* cmdList, int randerLayer);
+	void Draw(int randerLayer);
 
 	bool Pick(FXMVECTOR rayOriginW, FXMVECTOR rayDirW);
 
@@ -34,7 +36,7 @@ public:
 	std::unordered_map<std::string, std::unique_ptr<Instance>> mInstanceLayers[(int)RenderLayer::Count];
 
 private:
-	ID3D12Device* mDevice;
+	//
 };
 
 extern std::unique_ptr<InstanceManager> gInstanceManager;
