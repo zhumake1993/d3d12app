@@ -7,7 +7,6 @@
 #include "Common/GeometryGenerator.h"
 #include "Common/Camera.h"
 
-#include "Manager/Manager.h"
 #include "Manager/GameObjectManager.h"
 #include "Manager/InstanceManager.h"
 #include "Manager/TextureManager.h"
@@ -15,18 +14,19 @@
 #include "Manager/MeshManager.h"
 #include "Manager/InputManager.h"
 
-#include "Effect/RenderTarget.h"
-#include "Effect/ShaderResource.h"
-#include "Effect/DrawQuad.h"
-#include "Effect/Wireframe.h"
-#include "Effect/DepthComplexityUseStencil.h"
-#include "Effect/DepthComplexityUseBlend.h"
-#include "Effect/BlurFilter.h"
-#include "Effect/SobelFilter.h"
-#include "Effect/InverseFilter.h"
-#include "Effect/MultiplyFilter.h"
-#include "Effect/CubeMap.h"
-#include "Effect/ShadowMap.h"
+#include "Render/Wireframe.h"
+#include "Render/DepthComplexityUseStencil.h"
+#include "Render/DepthComplexityUseBlend.h"
+#include "Render/DrawQuad.h"
+#include "Render/RenderTarget.h"
+#include "Render/ShaderResource.h"
+#include "Render/CubeMap.h"
+#include "Render/ShadowMap.h"
+
+#include "Filter/BlurFilter.h"
+#include "Filter/SobelFilter.h"
+#include "Filter/InverseFilter.h"
+#include "Filter/MultiplyFilter.h"
 
 #include "GameObject/Sky.h"
 #include "GameObject/Box.h"
@@ -54,9 +54,9 @@ public:
 
 private:
 	virtual void OnResize()override;
-	virtual void Update(const GameTimer& gt)override;
+	virtual void Update()override;
 
-	virtual void Draw(const GameTimer& gt)override;
+	virtual void Draw()override;
 
 
 	virtual void OnMouseDown(WPARAM btnState, int x, int y)override;
@@ -66,50 +66,46 @@ private:
 	virtual void OnKeyDown(WPARAM vkCode)override;
 	virtual void OnKeyUp(WPARAM vkCode)override;
 
-	void OnKeyboardInput(const GameTimer& gt);
+	void OnKeyboardInput();
 
-	void UpdateFrameResource(const GameTimer& gt);
+	void UpdateFrameResource();
 
 	void BuildManagers();
-	void BuildEffects();
+	void BuildRenders();
+	void BuildFilters();
 	void BuildTextures();
 	void BuildMaterials();
 	void BuildMeshes();
 	void BuildGameObjects();
 
 	void BuildRootSignature();
-	void BuildShadersAndInputLayout();
+	void BuildShaders();
 	void BuildPSOs();
 
 	void Pick(int sx, int sy);
 
 private:
 
-	std::shared_ptr<CommonResource> mCommonResource;
-
-	std::shared_ptr<TextureManager> mTextureManager;
-	std::shared_ptr<MaterialManager> mMaterialManager;
-	std::shared_ptr<MeshManager> mMeshManager;
-	std::shared_ptr<InstanceManager> mInstanceManager;
-	std::shared_ptr<GameObjectManager> mGameObjectManager;
-	std::shared_ptr<InputManager> mInputManager;
-
-	std::shared_ptr<Camera> mCamera;
 	POINT mLastMousePos;
 
-	ComPtr<ID3D12RootSignature> mRootSignature = nullptr; // 根签名
-	std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders; // 着色器
-	std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout; // 顶点输入布局
-	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> mPSOs; // 渲染状态对象
+	XMFLOAT3 mRotatedLightDirections[3];
+	float mLightRotationAngle = 0.0f;
+	XMFLOAT3 mBaseLightDirections[3] = {
+		XMFLOAT3(0.57735f, -0.57735f, 0.57735f),
+		XMFLOAT3(-0.57735f, -0.57735f, 0.57735f),
+		XMFLOAT3(0.0f, -0.707f, -0.707f)
+	};
 
 	std::unique_ptr<MainFrameResource> mMainFrameResource; // Main帧资源
-	std::unique_ptr<FrameResource<PassConstants>> mPassCB; // passCB帧资源
 
-	std::unique_ptr<RenderTarget> mRenderTarget = nullptr;
 
-	std::unique_ptr<ShaderResource> mShaderResourceTemp = nullptr;
+	//
+	// Render
+	//
 
 	std::unique_ptr<DrawQuad> mDrawQuad = nullptr;
+	std::unique_ptr<RenderTarget> mRenderTarget = nullptr;
+	std::unique_ptr<ShaderResource> mShaderResourceTemp = nullptr;
 
 	std::unique_ptr<Wireframe> mWireframe = nullptr;
 	bool mIsWireframe = false;
@@ -120,6 +116,13 @@ private:
 	std::unique_ptr<DepthComplexityUseBlend> mDepthComplexityUseBlend = nullptr;
 	bool mIsDepthComplexityUseBlend = false;
 
+	std::unique_ptr<CubeMap> mCubeMap = nullptr;
+	std::unique_ptr<ShadowMap> mShadowMap = nullptr;
+
+	//
+	// Filter
+	//
+
 	std::unique_ptr<BlurFilter> mBlurFilter;
 	bool mIsBlur = false;
 
@@ -128,17 +131,5 @@ private:
 
 	std::unique_ptr<InverseFilter> mInverseFilter;
 	std::unique_ptr<MultiplyFilter> mMultiplyFilter;
-
-	std::unique_ptr<CubeMap> mCubeMap;
-
-	std::unique_ptr<ShadowMap> mShadowMap;
-
-	XMFLOAT3 mRotatedLightDirections[3];
-	float mLightRotationAngle = 0.0f;
-	XMFLOAT3 mBaseLightDirections[3] = {
-		XMFLOAT3(0.57735f, -0.57735f, 0.57735f),
-		XMFLOAT3(-0.57735f, -0.57735f, 0.57735f),
-		XMFLOAT3(0.0f, -0.707f, -0.707f)
-	};
 };
 

@@ -2,7 +2,6 @@
 
 #include "../Common/d3dUtil.h"
 #include "../Common/UploadBuffer.h"
-#include "Manager.h"
 
 using namespace DirectX;
 
@@ -20,13 +19,14 @@ struct MaterialData
 	UINT MaterialPad2;
 };
 
-class MaterialManager :
-	public Manager
+class MaterialManager
 {
 public:
 
-	MaterialManager(ID3D12Device* device);
+	MaterialManager();
 	~MaterialManager();
+
+	void Initialize(ID3D12Device* device);
 
 	UINT GetIndex(const std::string& name);
 
@@ -61,3 +61,5 @@ private:
 	std::unordered_map<std::string, UINT> mIndices;
 	std::unordered_map<std::string, int> mNumFramesDirties; // 指示对象数据发生变化
 };
+
+extern std::unique_ptr<MaterialManager> gMaterialManager;

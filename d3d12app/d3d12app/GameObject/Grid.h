@@ -6,11 +6,11 @@ class Grid :
 	public GameObject
 {
 public:
-	Grid(std::shared_ptr<CommonResource> commonResource);
+	Grid();
 	~Grid();
 
 private:
-	virtual void Update(const GameTimer& gt)override;
+	virtual void Update()override;
 
 public:
 

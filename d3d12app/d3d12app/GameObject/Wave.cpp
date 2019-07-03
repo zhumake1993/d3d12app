@@ -2,8 +2,8 @@
 #include <cassert>
 #include <ppl.h>
 
-Wave::Wave(std::shared_ptr<CommonResource> commonResource)
-	:GameObject(commonResource)
+Wave::Wave()
+	:GameObject()
 {
 	mGameObjectName = "wave";
 	mTranslation = XMFLOAT3(0.0f, -20.0f, 0.0f);
@@ -88,7 +88,7 @@ Wave::Wave(std::shared_ptr<CommonResource> commonResource)
 				k += 6;
 			}
 		}
-		GetMeshManager()->AddMesh("wave", vertices, indices);
+		gMeshManager->AddMesh("wave", vertices, indices);
 	}
 }
 
@@ -213,11 +213,11 @@ void Wave::Disturb(int i, int j, float magnitude)
 	mCurrSolution[(i - 1) * mNumCols + j].y += halfMag;
 }
 
-void Wave::Update(const GameTimer& gt)
+void Wave::Update()
 {
 	// 每0.25秒产生一个随机的波浪
 	static float t_base = 0.0f;
-	if ((gt.TotalTime() - t_base) >= 0.25f) {
+	if ((gTimer.TotalTime() - t_base) >= 0.25f) {
 		t_base += 0.25f;
 
 		int i = MathHelper::Rand(4, RowCount() - 5);
@@ -229,7 +229,7 @@ void Wave::Update(const GameTimer& gt)
 	}
 
 	// 更新波浪模拟
-	Update(gt.DeltaTime());
+	Update(gTimer.DeltaTime());
 
 	// 更新顶点缓冲
 	auto currWavesVB = mWavesVB->GetCurrResource().get();
@@ -246,19 +246,19 @@ void Wave::Update(const GameTimer& gt)
 	}
 
 	// 将波浪渲染项的动态顶点缓冲设置为当前帧的顶点缓冲
-	auto mesh = GetInstanceManager()->mInstanceLayers[mRenderLayer][mMeshName]->GetMesh();
+	auto mesh = gInstanceManager->mInstanceLayers[mRenderLayer][mMeshName]->GetMesh();
 
 	mesh->VertexBufferGPU = currWavesVB->Resource();
 	mesh->VertexBufferView.BufferLocation = mesh->VertexBufferGPU->GetGPUVirtualAddress();
 
 	// 更新纹理转换矩阵，营造一种流动的感觉
-	auto mat = GetMaterialManager()->GetMaterialData(mMatName);
+	auto mat = gMaterialManager->GetMaterialData(mMatName);
 
 	float& tu = mat.MatTransform(3, 0);
 	float& tv = mat.MatTransform(3, 1);
 
-	tu += 0.1f * gt.DeltaTime();
-	tv += 0.02f * gt.DeltaTime();
+	tu += 0.1f * gTimer.DeltaTime();
+	tv += 0.02f * gTimer.DeltaTime();
 
 	if (tu >= 1.0f)
 		tu -= 1.0f;
@@ -269,5 +269,5 @@ void Wave::Update(const GameTimer& gt)
 	mat.MatTransform(3, 0) = tu;
 	mat.MatTransform(3, 1) = tv;
 
-	GetMaterialManager()->SetMaterialData(mMatName, mat);
+	gMaterialManager->SetMaterialData(mMatName, mat);
 }

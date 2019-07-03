@@ -1,7 +1,7 @@
 #include "Grid.h"
 
-Grid::Grid(std::shared_ptr<CommonResource> commonResource)
-	:GameObject(commonResource)
+Grid::Grid()
+	:GameObject()
 {
 	mGameObjectName = "grid";
 
@@ -17,6 +17,6 @@ Grid::~Grid()
 {
 }
 
-void Grid::Update(const GameTimer& gt)
+void Grid::Update()
 {
 }

@@ -1,7 +1,7 @@
 #include "Sphere.h"
 
-Sphere::Sphere(std::shared_ptr<CommonResource> commonResource)
-	:GameObject(commonResource)
+Sphere::Sphere()
+	:GameObject()
 {
 	mMatName = "mirror";
 
@@ -14,6 +14,6 @@ Sphere::~Sphere()
 {
 }
 
-void Sphere::Update(const GameTimer& gt)
+void Sphere::Update()
 {
 }

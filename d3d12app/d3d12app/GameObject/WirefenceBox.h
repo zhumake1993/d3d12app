@@ -6,11 +6,11 @@ class WirefenceBox :
 	public GameObject
 {
 public:
-	WirefenceBox(std::shared_ptr<CommonResource> commonResource);
+	WirefenceBox();
 	~WirefenceBox();
 
 private:
-	virtual void Update(const GameTimer& gt)override;
+	virtual void Update()override;
 
 public:
 

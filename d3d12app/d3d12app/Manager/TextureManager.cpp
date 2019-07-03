@@ -1,14 +1,20 @@
 #include "TextureManager.h"
 
-TextureManager::TextureManager(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, UINT CbvSrvUavDescriptorSize)
+std::unique_ptr<TextureManager> gTextureManager = std::make_unique<TextureManager>();
+
+TextureManager::TextureManager()
 {
-	mDevice = device;
-	mCmdList = cmdList;
-	mCbvSrvUavDescriptorSize = CbvSrvUavDescriptorSize;
 }
 
 TextureManager::~TextureManager()
 {
+}
+
+void TextureManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, UINT CbvSrvUavDescriptorSize)
+{
+	mDevice = device;
+	mCmdList = cmdList;
+	mCbvSrvUavDescriptorSize = CbvSrvUavDescriptorSize;
 }
 
 UINT TextureManager::GetIndex(std::string name)

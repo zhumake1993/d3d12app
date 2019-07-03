@@ -1,9 +1,9 @@
 #include "MeshManager.h"
 
-MeshManager::MeshManager(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
+std::unique_ptr<MeshManager> gMeshManager = std::make_unique<MeshManager>();
+
+MeshManager::MeshManager()
 {
-	mDevice = device;
-	mCmdList = cmdList;
 }
 
 MeshManager::~MeshManager()
@@ -12,6 +12,12 @@ MeshManager::~MeshManager()
 		p.second->VertexBufferUploader = nullptr;
 		p.second->IndexBufferUploader = nullptr;
 	}
+}
+
+void MeshManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
+{
+	mDevice = device;
+	mCmdList = cmdList;
 }
 
 void MeshManager::AddMesh(std::string Name, GeometryGenerator::MeshData mesh)

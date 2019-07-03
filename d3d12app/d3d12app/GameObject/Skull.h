@@ -6,11 +6,11 @@ class Skull :
 	public GameObject
 {
 public:
-	Skull(std::shared_ptr<CommonResource> commonResource);
+	Skull();
 	~Skull();
 
 private:
-	virtual void Update(const GameTimer& gt)override;
+	virtual void Update()override;
 
 public:
 

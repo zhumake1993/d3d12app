@@ -6,11 +6,11 @@ class Globe :
 	public GameObject
 {
 public:
-	Globe(std::shared_ptr<CommonResource> commonResource);
+	Globe();
 	~Globe();
 
 private:
-	virtual void Update(const GameTimer& gt)override;
+	virtual void Update()override;
 
 public:
 

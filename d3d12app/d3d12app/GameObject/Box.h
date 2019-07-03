@@ -6,11 +6,11 @@ class Box :
 	public GameObject
 {
 public:
-	Box(std::shared_ptr<CommonResource> commonResource);
+	Box();
 	~Box();
 
 private:
-	virtual void Update(const GameTimer& gt)override;
+	virtual void Update()override;
 
 public:
 

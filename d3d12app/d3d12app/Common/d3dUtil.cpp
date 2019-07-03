@@ -1,8 +1,60 @@
 #include "d3dUtil.h"
 
-using Microsoft::WRL::ComPtr;
+//===========================================================
+//===========================================================
+// 全局变量
+//===========================================================
+//===========================================================
+
+std::wstring gMainWndCaption = L"d3d12app";
+D3D_DRIVER_TYPE gd3dDriverType = D3D_DRIVER_TYPE_HARDWARE;
+DXGI_FORMAT gBackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+DXGI_FORMAT gDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+int gClientWidth = 1200;
+int gClientHeight = 900;
+
+GameTimer gTimer;
+
+ComPtr<ID3D12Device> gD3D12Device = nullptr;
+ComPtr<ID3D12GraphicsCommandList> gCommandList = nullptr;
+
+bool g4xMsaaState = false;
+UINT g4xMsaaQuality = 0;
+
+D3D12_VIEWPORT gScreenViewport;
+D3D12_RECT gScissorRect;
+
+UINT gRtvDescriptorSize = 0;
+UINT gDsvDescriptorSize = 0;
+UINT gCbvSrvUavDescriptorSize = 0;
 
 int gCurrFrameResourceIndex = 0;
+
+//===========================================================
+//===========================================================
+// 顶点、输入布局、根签名、着色器、渲染状态对象
+//===========================================================
+//===========================================================
+
+std::vector<D3D12_INPUT_ELEMENT_DESC> gInputLayout =
+{
+	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+};
+
+std::unordered_map<std::string, ComPtr<ID3D12RootSignature>> gRootSignatures;
+
+std::unordered_map<std::string, ComPtr<ID3DBlob>> gShaders;
+
+std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> gPSOs;
+
+//===========================================================
+//===========================================================
+// 辅助类
+//===========================================================
+//===========================================================
 
 ComPtr<ID3DBlob> d3dUtil::LoadBinary(const std::wstring& filename)
 {

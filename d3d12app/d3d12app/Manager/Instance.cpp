@@ -1,12 +1,10 @@
 #include "Instance.h"
 
-Instance::Instance(ID3D12Device* device, std::shared_ptr<CommonResource> commonResource)
+Instance::Instance(ID3D12Device* device)
 {
 	for (int i = 0; i < gNumFrameResources; ++i) {
 		mFrameResources.push_back(std::make_unique<UploadBuffer<InstanceData>>(device, mInstanceDataCapacity, false));
 	}
-
-	mCommonResource = commonResource;
 }
 
 Instance::~Instance()
@@ -61,7 +59,7 @@ void Instance::UploadInstanceData()
 {
 	auto& uploadBuffer = mFrameResources[gCurrFrameResourceIndex];
 
-	XMMATRIX view = GetCamera()->GetView();
+	XMMATRIX view = gCamera->GetView();
 	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
 
 	mVisibleCount = 0;
@@ -78,14 +76,14 @@ void Instance::UploadInstanceData()
 
 		// 将平截头从视坐标空间转换到世界坐标空间
 		BoundingFrustum worldSpaceFrustum;
-		GetCamera()->mCamFrustum.Transform(worldSpaceFrustum, invView);
+		gCamera->mCamFrustum.Transform(worldSpaceFrustum, invView);
 
 		// 将包围盒从局部坐标空间转换到世界坐标空间
 		BoundingBox boundingBoxW;
 		mBounds.Transform(boundingBoxW, world);
 
 		// 平截头剔除
-		if ((worldSpaceFrustum.Contains(boundingBoxW) != DirectX::DISJOINT) || (GetCamera()->mFrustumCullingEnabled == false)) {
+		if ((worldSpaceFrustum.Contains(boundingBoxW) != DirectX::DISJOINT) || (gCamera->mFrustumCullingEnabled == false)) {
 
 			XMMATRIX world = XMLoadFloat4x4(&p.second.World);
 			XMMATRIX inverseTransposeWorld = XMLoadFloat4x4(&p.second.InverseTransposeWorld);
@@ -182,7 +180,7 @@ bool Instance::Pick(FXMVECTOR rayOriginW, FXMVECTOR rayDirW, std::string& name, 
 				XMVECTOR pointW = XMVector3TransformCoord(pointL, W);
 
 				// 由于scale矩阵的存在，tminL不是实际的距离，因此需要使用两点间距离公式来计算实际距离
-				float tminW = XMVectorGetX(XMVector3Length(GetCamera()->GetPosition() - pointW));
+				float tminW = XMVectorGetX(XMVector3Length(gCamera->GetPosition() - pointW));
 
 				if (tminW < tmin) {
 					result = true;
@@ -197,9 +195,3 @@ bool Instance::Pick(FXMVECTOR rayOriginW, FXMVECTOR rayDirW, std::string& name, 
 
 	return result;
 }
-
-std::shared_ptr<Camera> Instance::GetCamera()
-{
-	return std::static_pointer_cast<Camera>(mCommonResource->mCamera);
-}
-

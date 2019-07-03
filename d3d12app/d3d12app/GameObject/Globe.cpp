@@ -1,7 +1,7 @@
 #include "Globe.h"
 
-Globe::Globe(std::shared_ptr<CommonResource> commonResource)
-	:GameObject(commonResource)
+Globe::Globe()
+	:GameObject()
 {
 	mGameObjectName = "globe";
 
@@ -19,6 +19,6 @@ Globe::~Globe()
 {
 }
 
-void Globe::Update(const GameTimer& gt)
+void Globe::Update()
 {
 }

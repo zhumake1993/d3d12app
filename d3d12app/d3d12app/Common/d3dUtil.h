@@ -22,8 +22,88 @@
 #include "GameTimer.h"
 #include "DDSTextureLoader.h"
 
-const int gNumFrameResources = 3;
-extern int gCurrFrameResourceIndex; // 当前帧资源索引
+using Microsoft::WRL::ComPtr;
+
+//===========================================================
+//===========================================================
+// 全局变量
+//===========================================================
+//===========================================================
+
+extern std::wstring gMainWndCaption;					// 标题
+extern D3D_DRIVER_TYPE gd3dDriverType;					// 硬件类型
+extern DXGI_FORMAT gBackBufferFormat;					// 后缓冲格式
+extern DXGI_FORMAT gDepthStencilFormat;					// 深度模板缓冲格式
+extern int gClientWidth;								// 屏幕宽
+extern int gClientHeight;								// 屏幕高
+
+extern GameTimer gTimer;								// 计时器
+
+extern ComPtr<ID3D12Device> gD3D12Device;				// D3D12设备
+extern ComPtr<ID3D12GraphicsCommandList> gCommandList;	// 指令列表
+
+extern bool g4xMsaaState;								// 多重采样是否开启
+extern UINT g4xMsaaQuality;								// 多重采样质量
+
+extern D3D12_VIEWPORT gScreenViewport;					// 视口
+extern D3D12_RECT gScissorRect;							// 剪裁矩形
+
+extern UINT gRtvDescriptorSize;							// 渲染目标描述符的大小
+extern UINT gDsvDescriptorSize;							// 深度模板描述符的大小
+extern UINT gCbvSrvUavDescriptorSize;					// 常量缓冲描述符，着色器资源描述符，无序存取描述符的大小
+
+const int gNumFrameResources = 3;						// 帧资源数量
+extern int gCurrFrameResourceIndex;						// 当前帧资源索引
+
+//===========================================================
+//===========================================================
+// 顶点、输入布局、根签名、着色器、渲染状态对象
+//===========================================================
+//===========================================================
+
+// 顶点
+struct Vertex
+{
+	DirectX::XMFLOAT3 Pos;
+	DirectX::XMFLOAT3 Normal;
+	DirectX::XMFLOAT2 TexC;
+	DirectX::XMFLOAT3 TangentU;
+};
+
+// 输入布局
+extern std::vector<D3D12_INPUT_ELEMENT_DESC> gInputLayout;
+
+// 根签名
+extern std::unordered_map<std::string, ComPtr<ID3D12RootSignature>> gRootSignatures;
+
+// 着色器
+extern std::unordered_map<std::string, ComPtr<ID3DBlob>> gShaders;
+
+// 渲染状态对象
+extern std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> gPSOs;
+
+//===========================================================
+//===========================================================
+// 光
+//===========================================================
+//===========================================================
+
+#define MaxLights 16
+struct Light
+{
+	DirectX::XMFLOAT3 Strength = { 0.5f, 0.5f, 0.5f };
+	float FalloffStart = 1.0f;                          // 点光/聚光
+	DirectX::XMFLOAT3 Direction = { 0.0f, -1.0f, 0.0f };// 平行光/聚光
+	float FalloffEnd = 10.0f;                           // 点光/聚光
+	DirectX::XMFLOAT3 Position = { 0.0f, 0.0f, 0.0f };  // 点光/聚光
+	float SpotPower = 64.0f;                            // 聚光
+};
+
+//===========================================================
+//===========================================================
+// 渲染层
+//===========================================================
+//===========================================================
 
 enum class RenderLayer : int
 {
@@ -36,6 +116,12 @@ enum class RenderLayer : int
 
 	Count
 };
+
+//===========================================================
+//===========================================================
+// 辅助类
+//===========================================================
+//===========================================================
 
 class d3dUtil
 {
@@ -74,27 +160,11 @@ public:
 	static std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
 };
 
-struct Vertex
-{
-	DirectX::XMFLOAT3 Pos;
-	DirectX::XMFLOAT3 Normal;
-	DirectX::XMFLOAT2 TexC;
-	DirectX::XMFLOAT3 TangentU;
-};
-
-// 成员顺序至关重要，因为HLSL会将其打包成4D向量
-// 有可能出现C++与HLSL结构布局不匹配的情况，造成错误
-struct Light
-{
-	DirectX::XMFLOAT3 Strength = { 0.5f, 0.5f, 0.5f };
-	float FalloffStart = 1.0f;                          // 点光/聚光
-	DirectX::XMFLOAT3 Direction = { 0.0f, -1.0f, 0.0f };// 平行光/聚光
-	float FalloffEnd = 10.0f;                           // 点光/聚光
-	DirectX::XMFLOAT3 Position = { 0.0f, 0.0f, 0.0f };  // 点光/聚光
-	float SpotPower = 64.0f;                            // 聚光
-};
-
-#define MaxLights 16
+//===========================================================
+//===========================================================
+// 异常与调试
+//===========================================================
+//===========================================================
 
 class DxException
 {

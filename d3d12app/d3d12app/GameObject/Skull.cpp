@@ -1,7 +1,7 @@
 #include "Skull.h"
 
-Skull::Skull(std::shared_ptr<CommonResource> commonResource)
-	:GameObject(commonResource)
+Skull::Skull()
+	:GameObject()
 {
 	mGameObjectName = "skull";
 	mScale = XMFLOAT3(0.2f, 0.2f, 0.2f);
@@ -62,7 +62,7 @@ Skull::Skull(std::shared_ptr<CommonResource> commonResource)
 
 		fin.close();
 
-		GetMeshManager()->AddMesh("skull", vertices, indices);
+		gMeshManager->AddMesh("skull", vertices, indices);
 	}
 }
 
@@ -70,8 +70,8 @@ Skull::~Skull()
 {
 }
 
-void Skull::Update(const GameTimer& gt)
+void Skull::Update()
 {
-	mTranslation = XMFLOAT3(3.0f * cos(gt.TotalTime()*0.5f), 2.0f, 3.0f * sin(gt.TotalTime()*0.5f));
-	mRotation = XMFLOAT3(0.0f, gt.TotalTime(), 0.0f);
+	mTranslation = XMFLOAT3(3.0f * cos(gTimer.TotalTime()*0.5f), 2.0f, 3.0f * sin(gTimer.TotalTime()*0.5f));
+	mRotation = XMFLOAT3(0.0f, gTimer.TotalTime(), 0.0f);
 }

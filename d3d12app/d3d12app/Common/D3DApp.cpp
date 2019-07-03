@@ -27,7 +27,7 @@ D3DApp::D3DApp(HINSTANCE hInstance)
 
 D3DApp::~D3DApp()
 {
-	if (md3dDevice != nullptr)
+	if (gD3D12Device != nullptr)
 		FlushCommandQueue();
 }
 
@@ -43,19 +43,19 @@ HWND D3DApp::MainWnd()const
 
 float D3DApp::AspectRatio()const
 {
-	return static_cast<float>(mClientWidth) / mClientHeight;
+	return static_cast<float>(gClientWidth) / gClientHeight;
 }
 
 bool D3DApp::Get4xMsaaState()const
 {
-	return m4xMsaaState;
+	return g4xMsaaState;
 }
 
 void D3DApp::Set4xMsaaState(bool value)
 {
-	if (m4xMsaaState != value)
+	if (g4xMsaaState != value)
 	{
-		m4xMsaaState = value;
+		g4xMsaaState = value;
 
 		//重新创建交换链和缓冲
 		CreateSwapChain();
@@ -67,7 +67,7 @@ int D3DApp::Run()
 {
 	MSG msg = { 0 };
 
-	mTimer.Reset();
+	gTimer.Reset();
 
 	while (msg.message != WM_QUIT)
 	{
@@ -78,13 +78,13 @@ int D3DApp::Run()
 		}
 		else
 		{
-			mTimer.Tick();
+			gTimer.Tick();
 
 			if (!mAppPaused)
 			{
 				CalculateFrameStats();
-				Update(mTimer);
-				Draw(mTimer);
+				Update();
+				Draw();
 			}
 			else
 			{
@@ -116,7 +116,7 @@ void D3DApp::CreateRtvAndDsvDescriptorHeaps()
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	rtvHeapDesc.NodeMask = 0;
-	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(
+	ThrowIfFailed(gD3D12Device->CreateDescriptorHeap(
 		&rtvHeapDesc, IID_PPV_ARGS(mRtvHeap.GetAddressOf())));
 
 
@@ -125,20 +125,20 @@ void D3DApp::CreateRtvAndDsvDescriptorHeaps()
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	dsvHeapDesc.NodeMask = 0;
-	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(
+	ThrowIfFailed(gD3D12Device->CreateDescriptorHeap(
 		&dsvHeapDesc, IID_PPV_ARGS(mDsvHeap.GetAddressOf())));
 }
 
 void D3DApp::OnResize()
 {
-	assert(md3dDevice);
+	assert(gD3D12Device);
 	assert(mSwapChain);
 	assert(mDirectCmdListAlloc);
 
 	//flush指令队列
 	FlushCommandQueue();
 
-	ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
+	ThrowIfFailed(gCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
 
 	for (int i = 0; i < SwapChainBufferCount; ++i)
 		mSwapChainBuffer[i].Reset();
@@ -146,8 +146,8 @@ void D3DApp::OnResize()
 
 	ThrowIfFailed(mSwapChain->ResizeBuffers(
 		SwapChainBufferCount,
-		mClientWidth, mClientHeight,
-		mBackBufferFormat,
+		gClientWidth, gClientHeight,
+		gBackBufferFormat,
 		DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH));
 
 	mCurrBackBuffer = 0;
@@ -157,29 +157,29 @@ void D3DApp::OnResize()
 	for (UINT i = 0; i < SwapChainBufferCount; i++)
 	{
 		ThrowIfFailed(mSwapChain->GetBuffer(i, IID_PPV_ARGS(&mSwapChainBuffer[i])));
-		md3dDevice->CreateRenderTargetView(mSwapChainBuffer[i].Get(), nullptr, rtvHeapHandle);
-		rtvHeapHandle.Offset(1, mRtvDescriptorSize);
+		gD3D12Device->CreateRenderTargetView(mSwapChainBuffer[i].Get(), nullptr, rtvHeapHandle);
+		rtvHeapHandle.Offset(1, gRtvDescriptorSize);
 	}
 
 	//创建深度模板缓冲和视图
 	D3D12_RESOURCE_DESC depthStencilDesc;
 	depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 	depthStencilDesc.Alignment = 0;
-	depthStencilDesc.Width = mClientWidth;
-	depthStencilDesc.Height = mClientHeight;
+	depthStencilDesc.Width = gClientWidth;
+	depthStencilDesc.Height = gClientHeight;
 	depthStencilDesc.DepthOrArraySize = 1;
 	depthStencilDesc.MipLevels = 1;  
 	depthStencilDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;//创建针对同一资源的不同视图需要指定为typeless
-	depthStencilDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
-	depthStencilDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+	depthStencilDesc.SampleDesc.Count = g4xMsaaState ? 4 : 1;
+	depthStencilDesc.SampleDesc.Quality = g4xMsaaState ? (g4xMsaaQuality - 1) : 0;
 	depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
 	D3D12_CLEAR_VALUE optClear;
-	optClear.Format = mDepthStencilFormat;
+	optClear.Format = gDepthStencilFormat;
 	optClear.DepthStencil.Depth = 1.0f;
 	optClear.DepthStencil.Stencil = 0;
-	ThrowIfFailed(md3dDevice->CreateCommittedResource(
+	ThrowIfFailed(gD3D12Device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&depthStencilDesc,
@@ -191,32 +191,32 @@ void D3DApp::OnResize()
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
 	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-	dsvDesc.Format = mDepthStencilFormat;
+	dsvDesc.Format = gDepthStencilFormat;
 	dsvDesc.Texture2D.MipSlice = 0;
-	md3dDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, DepthStencilView());
+	gD3D12Device->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, DepthStencilView());
 
 	//改编资源状态
-	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
+	gCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
 		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
 	//执行resize指令
-	ThrowIfFailed(mCommandList->Close());
-	ID3D12CommandList * cmdsLists[] = { mCommandList.Get() };
+	ThrowIfFailed(gCommandList->Close());
+	ID3D12CommandList * cmdsLists[] = { gCommandList.Get() };
 	mCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
 	//等待GPU完成resize指令
 	FlushCommandQueue();
 
 	//更新视口
-	mScreenViewport.TopLeftX = 0;
-	mScreenViewport.TopLeftY = 0;
-	mScreenViewport.Width = static_cast<float>(mClientWidth);
-	mScreenViewport.Height = static_cast<float>(mClientHeight);
-	mScreenViewport.MinDepth = 0.0f;
-	mScreenViewport.MaxDepth = 1.0f;
+	gScreenViewport.TopLeftX = 0;
+	gScreenViewport.TopLeftY = 0;
+	gScreenViewport.Width = static_cast<float>(gClientWidth);
+	gScreenViewport.Height = static_cast<float>(gClientHeight);
+	gScreenViewport.MinDepth = 0.0f;
+	gScreenViewport.MaxDepth = 1.0f;
 
 	//更新剪裁矩形
-	mScissorRect = { 0, 0, mClientWidth, mClientHeight };
+	gScissorRect = { 0, 0, gClientWidth, gClientHeight };
 }
 
 LRESULT D3DApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -230,20 +230,20 @@ LRESULT D3DApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		if (LOWORD(wParam) == WA_INACTIVE)
 		{
 			mAppPaused = true;
-			mTimer.Stop();
+			gTimer.Stop();
 		}
 		else
 		{
 			mAppPaused = false;
-			mTimer.Start();
+			gTimer.Start();
 		}
 		return 0;
 
 	case WM_SIZE:
 		//保存新客户区域的大小
-		mClientWidth = LOWORD(lParam);
-		mClientHeight = HIWORD(lParam);
-		if (md3dDevice)
+		gClientWidth = LOWORD(lParam);
+		gClientHeight = HIWORD(lParam);
+		if (gD3D12Device)
 		{
 			if (wParam == SIZE_MINIMIZED)
 			{
@@ -288,14 +288,14 @@ LRESULT D3DApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_ENTERSIZEMOVE:
 		mAppPaused = true;
 		mResizing = true;
-		mTimer.Stop();
+		gTimer.Stop();
 		return 0;
 
 		// WM_EXITSIZEMOVE ：用户结束改变窗口大小
 	case WM_EXITSIZEMOVE:
 		mAppPaused = false;
 		mResizing = false;
-		mTimer.Start();
+		gTimer.Start();
 		OnResize();
 		return 0;
 
@@ -330,7 +330,7 @@ LRESULT D3DApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		if (wParam == VK_ESCAPE) {
 			PostQuitMessage(0);
 		} else if ((int)wParam == VK_F2)
-			Set4xMsaaState(!m4xMsaaState);
+			Set4xMsaaState(!g4xMsaaState);
 		else
 			OnKeyUp(wParam);
 
@@ -360,12 +360,12 @@ bool D3DApp::InitMainWindow()
 		return false;
 	}
 
-	RECT R = { 0, 0, mClientWidth, mClientHeight };
+	RECT R = { 0, 0, gClientWidth, gClientHeight };
 	AdjustWindowRect(&R, WS_OVERLAPPEDWINDOW, false);
 	int width = R.right - R.left;
 	int height = R.bottom - R.top;
 
-	mhMainWnd = CreateWindow(L"MainWnd", mMainWndCaption.c_str(),
+	mhMainWnd = CreateWindow(L"MainWnd", gMainWndCaption.c_str(),
 		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, width, height, 0, 0, mhAppInst, 0);
 
 	if (!mhMainWnd)
@@ -397,7 +397,7 @@ bool D3DApp::InitDirect3D()
 	HRESULT hardwareResult = D3D12CreateDevice(
 		nullptr,             //默认适配器
 		D3D_FEATURE_LEVEL_11_0,
-		IID_PPV_ARGS(&md3dDevice));
+		IID_PPV_ARGS(&gD3D12Device));
 
 	//如果尝试创建硬件设备失败，改为创建WARP设备
 	if (FAILED(hardwareResult))
@@ -408,32 +408,32 @@ bool D3DApp::InitDirect3D()
 		ThrowIfFailed(D3D12CreateDevice(
 			pWarpAdapter.Get(),
 			D3D_FEATURE_LEVEL_11_0,
-			IID_PPV_ARGS(&md3dDevice)));
+			IID_PPV_ARGS(&gD3D12Device)));
 	}
 
-	ThrowIfFailed(md3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+	ThrowIfFailed(gD3D12Device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
 		IID_PPV_ARGS(&mFence)));
 
 	//获取描述符的大小
-	mRtvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	mDsvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-	mCbvSrvUavDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	gRtvDescriptorSize = gD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	gDsvDescriptorSize = gD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	gCbvSrvUavDescriptorSize = gD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	//检测支持的4X MSAA的质量，与后备缓冲格式相关
 	//所有支持Direct3D 11的设备都支持4X MSAA，无论后备缓冲格式如何
 	//因此，我们只需检测支持的4X MSAA的质量
 	D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS msQualityLevels;
-	msQualityLevels.Format = mBackBufferFormat;
+	msQualityLevels.Format = gBackBufferFormat;
 	msQualityLevels.SampleCount = 4;
 	msQualityLevels.Flags = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE;
 	msQualityLevels.NumQualityLevels = 0;
-	ThrowIfFailed(md3dDevice->CheckFeatureSupport(
+	ThrowIfFailed(gD3D12Device->CheckFeatureSupport(
 		D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
 		&msQualityLevels,
 		sizeof(msQualityLevels)));
 
-	m4xMsaaQuality = msQualityLevels.NumQualityLevels;
-	assert(m4xMsaaQuality > 0 && "Unexpected MSAA quality level.");
+	g4xMsaaQuality = msQualityLevels.NumQualityLevels;
+	assert(g4xMsaaQuality > 0 && "Unexpected MSAA quality level.");
 
 #ifdef _DEBUG
 	LogAdapters();
@@ -452,23 +452,23 @@ void D3DApp::CreateCommandObjects()
 	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	ThrowIfFailed(md3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&mCommandQueue)));
+	ThrowIfFailed(gD3D12Device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&mCommandQueue)));
 
 	//创建指令分配器
-	ThrowIfFailed(md3dDevice->CreateCommandAllocator(
+	ThrowIfFailed(gD3D12Device->CreateCommandAllocator(
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
 		IID_PPV_ARGS(mDirectCmdListAlloc.GetAddressOf())));
 
 	//创建指令列表
-	ThrowIfFailed(md3dDevice->CreateCommandList(
+	ThrowIfFailed(gD3D12Device->CreateCommandList(
 		0,
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
 		mDirectCmdListAlloc.Get(), //关联的指令分配器
 		nullptr,                   //初始管线状态
-		IID_PPV_ARGS(mCommandList.GetAddressOf())));
+		IID_PPV_ARGS(gCommandList.GetAddressOf())));
 
 	//将其设为关闭状态。因为第一次使用时会调用Reset函数，这需要其处于关闭状态
-	mCommandList->Close();
+	gCommandList->Close();
 }
 
 void D3DApp::CreateSwapChain()
@@ -477,15 +477,15 @@ void D3DApp::CreateSwapChain()
 	mSwapChain.Reset();
 
 	DXGI_SWAP_CHAIN_DESC sd;
-	sd.BufferDesc.Width = mClientWidth;
-	sd.BufferDesc.Height = mClientHeight;
+	sd.BufferDesc.Width = gClientWidth;
+	sd.BufferDesc.Height = gClientHeight;
 	sd.BufferDesc.RefreshRate.Numerator = 60;
 	sd.BufferDesc.RefreshRate.Denominator = 1;
-	sd.BufferDesc.Format = mBackBufferFormat;
+	sd.BufferDesc.Format = gBackBufferFormat;
 	sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 	sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-	sd.SampleDesc.Count = m4xMsaaState ? 4 : 1;
-	sd.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+	sd.SampleDesc.Count = g4xMsaaState ? 4 : 1;
+	sd.SampleDesc.Quality = g4xMsaaState ? (g4xMsaaQuality - 1) : 0;
 	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	sd.BufferCount = SwapChainBufferCount;
 	sd.OutputWindow = mhMainWnd;
@@ -528,7 +528,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::CurrentBackBufferView()const
 	return CD3DX12_CPU_DESCRIPTOR_HANDLE(
 		mRtvHeap->GetCPUDescriptorHandleForHeapStart(),
 		mCurrBackBuffer,
-		mRtvDescriptorSize);
+		gRtvDescriptorSize);
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::DepthStencilView()const
@@ -543,7 +543,7 @@ void D3DApp::CalculateFrameStats()
 
 	frameCnt++;
 
-	if ((mTimer.TotalTime() - timeElapsed) >= 1.0f)
+	if ((gTimer.TotalTime() - timeElapsed) >= 1.0f)
 	{
 		float fps = (float)frameCnt;
 		float mspf = 1000.0f / fps;
@@ -551,7 +551,7 @@ void D3DApp::CalculateFrameStats()
 		wstring fpsStr = to_wstring(fps);
 		wstring mspfStr = to_wstring(mspf);
 
-		wstring windowText = mMainWndCaption +
+		wstring windowText = gMainWndCaption +
 			L"    fps: " + fpsStr +
 			L"   mspf: " + mspfStr;
 
@@ -604,7 +604,7 @@ void D3DApp::LogAdapterOutputs(IDXGIAdapter * adapter)
 		text += L"\n";
 		OutputDebugString(text.c_str());
 
-		LogOutputDisplayModes(output, mBackBufferFormat);
+		LogOutputDisplayModes(output, gBackBufferFormat);
 
 		ReleaseCom(output);
 

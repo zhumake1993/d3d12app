@@ -1,7 +1,7 @@
 #include "Hill.h"
 
-Hill::Hill(std::shared_ptr<CommonResource> commonResource)
-	:GameObject(commonResource)
+Hill::Hill()
+	:GameObject()
 {
 	mGameObjectName = "hill";
 	mTranslation = XMFLOAT3(0.0f, -20.0f, 0.0f);
@@ -24,13 +24,13 @@ Hill::Hill(std::shared_ptr<CommonResource> commonResource)
 		XMStoreFloat3(&n, unitNormal);
 		v.Normal = n;
 	}
-	GetMeshManager()->AddMesh("hill", hill);
+	gMeshManager->AddMesh("hill", hill);
 }
 
 Hill::~Hill()
 {
 }
 
-void Hill::Update(const GameTimer& gt)
+void Hill::Update()
 {
 }

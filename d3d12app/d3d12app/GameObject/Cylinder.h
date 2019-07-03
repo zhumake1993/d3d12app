@@ -6,11 +6,11 @@ class Cylinder :
 	public GameObject
 {
 public:
-	Cylinder(std::shared_ptr<CommonResource> commonResource);
+	Cylinder();
 	~Cylinder();
 
 private:
-	virtual void Update(const GameTimer& gt)override;
+	virtual void Update()override;
 
 public:
 

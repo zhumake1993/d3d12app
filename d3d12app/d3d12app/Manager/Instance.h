@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../Common/d3dUtil.h"
+#include "../Common/Camera.h"
 #include "../Common/UploadBuffer.h"
-#include "MaterialManager.h"
 #include "MeshManager.h"
 
 using namespace DirectX;
@@ -23,7 +23,7 @@ class Instance
 	friend class InstanceManager;
 
 public:
-	Instance(ID3D12Device* device, std::shared_ptr<CommonResource> commonResource);
+	Instance(ID3D12Device* device);
 	virtual ~Instance();
 
 	std::shared_ptr<Mesh> GetMesh();
@@ -43,7 +43,7 @@ public:
 	bool Pick(FXMVECTOR rayOriginW, FXMVECTOR rayDirW, std::string& name, float& tmin, XMVECTOR& point);
 
 private:
-	std::shared_ptr<Camera> GetCamera();
+	//
 
 public:
 	//
@@ -63,8 +63,4 @@ private:
 	BoundingBox mBounds;
 
 	std::unordered_map<std::string, InstanceData> mInstances;
-
-private:
-
-	std::shared_ptr<CommonResource> mCommonResource;
 };

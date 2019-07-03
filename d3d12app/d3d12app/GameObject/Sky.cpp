@@ -1,7 +1,7 @@
 #include "Sky.h"
 
-Sky::Sky(std::shared_ptr<CommonResource> commonResource)
-	:GameObject(commonResource)
+Sky::Sky()
+	:GameObject()
 {
 	mGameObjectName = "sky";
 
@@ -18,6 +18,6 @@ Sky::~Sky()
 {
 }
 
-void Sky::Update(const GameTimer& gt)
+void Sky::Update()
 {
 }

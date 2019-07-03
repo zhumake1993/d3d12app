@@ -1,25 +1,25 @@
 #pragma once
 
 #include "../Common/d3dUtil.h"
-#include "Manager.h"
 
 const int size = 256;
 
-class InputManager :
-	public Manager
+class InputManager
 {
 public:
 	InputManager();
 	~InputManager();
 
-	void Update(const GameTimer& gt);
+	void Initialize();
 
-	void OnKeyDown(int key);
-	void OnKeyUp(int key);
+	void Update();
 
-	bool GetKeyDown(int key);
-	bool GetKeyPress(int key);
-	bool GetKeyUp(int key);
+	void OnKeyDown(WPARAM key);
+	void OnKeyUp(WPARAM key);
+
+	bool GetKeyDown(WPARAM key);
+	bool GetKeyPress(WPARAM key);
+	bool GetKeyUp(WPARAM key);
 
 private:
 	void Clear();
@@ -32,3 +32,5 @@ private:
 	bool mKeyPress[size];
 	bool mKeyUp[size];
 };
+
+extern std::unique_ptr<InputManager> gInputManager;

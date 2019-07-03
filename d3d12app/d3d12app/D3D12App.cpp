@@ -15,29 +15,29 @@ bool D3D12App::Initialize()
 		return false;
 
 	// 重置指令列表，为初始化指令做准备
-	ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
+	ThrowIfFailed(gCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
 
-	mCamera = std::make_shared<Camera>();
-	mCamera->SetPosition(0.0f, 2.0f, -15.0f);
-	mCamera->SetLens(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+	mMainFrameResource = std::make_unique<MainFrameResource>(gD3D12Device.Get());
+	gPassCB->Initialize(gD3D12Device.Get(), 1, false);
+
+	gCamera->SetPosition(0.0f, 2.0f, -15.0f);
+
+	BuildRootSignature();
+	BuildShaders();
 
 	BuildManagers();
-	BuildEffects();
+	BuildRenders();
+	BuildFilters();
 	BuildTextures();
 	BuildMaterials();
 	BuildMeshes();
 	BuildGameObjects();
 
-	BuildRootSignature();
-	BuildShadersAndInputLayout();
 	BuildPSOs();
 
-	mMainFrameResource = std::make_unique<MainFrameResource>(md3dDevice.Get());
-	mPassCB = std::make_unique<FrameResource<PassConstants>>(md3dDevice.Get(), 1, false);
-
 	// 执行初始化指令
-	ThrowIfFailed(mCommandList->Close());
-	ID3D12CommandList* cmdsLists[] = { mCommandList.Get() };
+	ThrowIfFailed(gCommandList->Close());
+	ID3D12CommandList* cmdsLists[] = { gCommandList.Get() };
 	mCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
 	// 等待初始化完成
@@ -50,42 +50,12 @@ void D3D12App::OnResize()
 {
 	D3DApp::OnResize();
 
-	if (mCamera != nullptr) {
-		mCamera->SetLens(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
-	}
-
-	if (mRenderTarget != nullptr) {
-		mRenderTarget->OnResize(mClientWidth, mClientHeight);
-	}
-
-	if (mShaderResourceTemp != nullptr) {
-		mShaderResourceTemp->OnResize(mClientWidth, mClientHeight);
-	}
-
-	if (mDrawQuad != nullptr) {
-		mDrawQuad->OnResize(mClientWidth, mClientHeight);
-	}
-
-	if (mBlurFilter != nullptr) {
-		mBlurFilter->OnResize(mClientWidth, mClientHeight);
-	}
-
-	if (mSobelFilter != nullptr) {
-		mSobelFilter->OnResize(mClientWidth, mClientHeight);
-	}
-
-	if (mInverseFilter != nullptr) {
-		mInverseFilter->OnResize(mClientWidth, mClientHeight);
-	}
-
-	if (mMultiplyFilter != nullptr) {
-		mMultiplyFilter->OnResize(mClientWidth, mClientHeight);
-	}
+	gCamera->SetLens(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 }
 
-void D3D12App::Update(const GameTimer& gt)
+void D3D12App::Update()
 {
-	OnKeyboardInput(gt);
+	OnKeyboardInput();
 
 	// 扫描帧资源环形数组
 	gCurrFrameResourceIndex = (gCurrFrameResourceIndex + 1) % gNumFrameResources;
@@ -101,7 +71,7 @@ void D3D12App::Update(const GameTimer& gt)
 	}
 
 	// 移动光
-	mLightRotationAngle += 0.1f * gt.DeltaTime();
+	mLightRotationAngle += 0.1f * gTimer.DeltaTime();
 	XMMATRIX R = XMMatrixRotationY(mLightRotationAngle);
 	for (int i = 0; i < 3; ++i) {
 		XMVECTOR lightDir = XMLoadFloat3(&mBaseLightDirections[i]);
@@ -110,18 +80,18 @@ void D3D12App::Update(const GameTimer& gt)
 	}
 
 	// 注意，更新顺序很重要！
-	mMaterialManager->UpdateMaterialData();
-	mGameObjectManager->Update(gt);
-	mInputManager->Update(gt);
-	mInstanceManager->UploadInstanceData();
+	gMaterialManager->UpdateMaterialData();
+	gGameObjectManager->Update();
+	gInputManager->Update();
+	gInstanceManager->UploadInstanceData();
 
 	//
 	mShadowMap->Update(mRotatedLightDirections[0]);
 
-	UpdateFrameResource(gt);
+	UpdateFrameResource();
 }
 
-void D3D12App::Draw(const GameTimer& gt)
+void D3D12App::Draw()
 {
 	// 获取当前的指令分配器
 	auto cmdListAlloc = mMainFrameResource->GetCurrCmdListAlloc();
@@ -132,81 +102,74 @@ void D3D12App::Draw(const GameTimer& gt)
 
 	//重置指令列表以重用内存
 	//必须在使用ExecuteCommandList将指令列表添加进指令队列后才能执行该操作
-	ThrowIfFailed(mCommandList->Reset(cmdListAlloc.Get(), mPSOs["opaque"].Get()));
-
-	//设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
-	mCommandList->RSSetViewports(1, &mScreenViewport);
-	mCommandList->RSSetScissorRects(1, &mScissorRect);
-
-	//清空后背缓冲和深度模板缓冲
-	mCommandList->ClearRenderTargetView(mRenderTarget->Rtv(), DirectX::Colors::LightSteelBlue, 0, nullptr);
-	mCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
-	//设置渲染目标
-	mCommandList->OMSetRenderTargets(1, &mRenderTarget->Rtv(), true, &DepthStencilView());
-
-
-
+	ThrowIfFailed(gCommandList->Reset(cmdListAlloc.Get(), gPSOs["opaque"].Get()));
 
 	//
 	// 主绘制
 	//
 
-	// 绑定描述符堆
-	ID3D12DescriptorHeap* descriptorHeaps[] = { mTextureManager->GetSrvDescriptorHeapPtr() };
-	mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-
-	// 设置根签名
-	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
-
-	// 绑定常量缓冲
-	auto passCB = mPassCB->GetCurrResource()->Resource();
-	mCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
-
-	// 绑定所有材质。对于结构化缓冲，我们可以绕过堆，使用根描述符
-	auto matBuffer = mMaterialManager->CurrResource();
-	mCommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
-
-	// 绑定所有的纹理
-	mCommandList->SetGraphicsRootDescriptorTable(5, mTextureManager->GetGpuSrvTex());
-
-	// 绑定天空球立方体贴图
-	mCommandList->SetGraphicsRootDescriptorTable(3, mTextureManager->GetGpuSrvCube());
-
 	if (mIsWireframe) {
-		mWireframe->Draw(mInstanceManager);
+		mWireframe->Draw(mRenderTarget->Rtv(), DepthStencilView());
 	} 
 	else if (mIsDepthComplexityUseStencil) {
-		mDepthComplexityUseStencil->Draw(mInstanceManager);
+		mDepthComplexityUseStencil->Draw(mRenderTarget->Rtv(), DepthStencilView());
 	}
 	else if (mIsDepthComplexityUseBlend) {
-		mDepthComplexityUseBlend->Draw(mInstanceManager);
+		mDepthComplexityUseBlend->Draw(mRenderTarget->Rtv(), DepthStencilView());
+		mInverseFilter->ExcuteInOut(mRenderTarget->Resource(), mRenderTarget->Resource());
 	}
 	else {
-		mShadowMap->DrawSceneToShadowMap(mInstanceManager);
+		// 绑定描述符堆
+		ID3D12DescriptorHeap* descriptorHeaps[] = { gTextureManager->GetSrvDescriptorHeapPtr() };
+		gCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-		//设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
-		mCommandList->RSSetViewports(1, &mScreenViewport);
-		mCommandList->RSSetScissorRects(1, &mScissorRect);
-
-		//清空后背缓冲和深度模板缓冲
-		mCommandList->ClearRenderTargetView(mRenderTarget->Rtv(), DirectX::Colors::LightSteelBlue, 0, nullptr);
-		mCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
-		//设置渲染目标
-		mCommandList->OMSetRenderTargets(1, &mRenderTarget->Rtv(), true, &DepthStencilView());
+		// 设置根签名
+		gCommandList->SetGraphicsRootSignature(gRootSignatures["main"].Get());
 
 		// 绑定常量缓冲
-		auto passCB = mPassCB->GetCurrResource()->Resource();
-		mCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
+		auto passCB = gPassCB->GetCurrResource()->Resource();
+		gCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
+
+		// 绑定所有材质。对于结构化缓冲，我们可以绕过堆，使用根描述符
+		auto matBuffer = gMaterialManager->CurrResource();
+		gCommandList->SetGraphicsRootShaderResourceView(2, matBuffer->GetGPUVirtualAddress());
+
+		// 绑定所有的纹理
+		gCommandList->SetGraphicsRootDescriptorTable(5, gTextureManager->GetGpuSrvTex());
 
 		// 绑定天空球立方体贴图
-		mCommandList->SetGraphicsRootDescriptorTable(3, mTextureManager->GetGpuSrvCube());
+		gCommandList->SetGraphicsRootDescriptorTable(3, gTextureManager->GetGpuSrvCube());
+
+
+
+
+		// 绘制阴影时要关闭平截头剔除
+		gCamera->mFrustumCullingEnabled = false;
+
+		mShadowMap->DrawSceneToShadowMap();
+
+		//设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
+		gCommandList->RSSetViewports(1, &gScreenViewport);
+		gCommandList->RSSetScissorRects(1, &gScissorRect);
+
+		//清空后背缓冲和深度模板缓冲
+		gCommandList->ClearRenderTargetView(mRenderTarget->Rtv(), DirectX::Colors::Black, 0, nullptr);
+		gCommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+
+		//设置渲染目标
+		gCommandList->OMSetRenderTargets(1, &mRenderTarget->Rtv(), true, &DepthStencilView());
+
+		// 绑定常量缓冲
+		passCB = gPassCB->GetCurrResource()->Resource();
+		gCommandList->SetGraphicsRootConstantBufferView(1, passCB->GetGPUVirtualAddress());
+
+		// 绑定天空球立方体贴图
+		gCommandList->SetGraphicsRootDescriptorTable(3, gTextureManager->GetGpuSrvCube());
 
 		// 绑定阴影贴图
 		ID3D12DescriptorHeap* descriptorHeapsCube[] = { mShadowMap->GetSrvDescriptorHeapPtr() };
-		mCommandList->SetDescriptorHeaps(_countof(descriptorHeapsCube), descriptorHeapsCube);
-		mCommandList->SetGraphicsRootDescriptorTable(4, mShadowMap->Srv());
+		gCommandList->SetDescriptorHeaps(_countof(descriptorHeapsCube), descriptorHeapsCube);
+		gCommandList->SetGraphicsRootDescriptorTable(4, mShadowMap->Srv());
 
 		//// 绘制动态立方体贴图时要关闭平截头剔除
 		//mCamera->mFrustumCullingEnabled = false;
@@ -247,17 +210,17 @@ void D3D12App::Draw(const GameTimer& gt)
 
 		//mCommandList->SetGraphicsRootDescriptorTable(3, mTextureManager->GetGpuSrvCube());
 
-		mCommandList->SetPipelineState(mPSOs["opaque"].Get());
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Opaque);
+		gCommandList->SetPipelineState(gPSOs["opaque"].Get());
+		gInstanceManager->Draw(gCommandList.Get(), (int)RenderLayer::Opaque);
 
-		mCommandList->SetPipelineState(mPSOs["alphaTested"].Get());
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::AlphaTested);
+		gCommandList->SetPipelineState(gPSOs["alphaTested"].Get());
+		gInstanceManager->Draw(gCommandList.Get(), (int)RenderLayer::AlphaTested);
 
-		mCommandList->SetPipelineState(mPSOs["transparent"].Get());
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Transparent);
+		gCommandList->SetPipelineState(gPSOs["transparent"].Get());
+		gInstanceManager->Draw(gCommandList.Get(), (int)RenderLayer::Transparent);
 
-		mCommandList->SetPipelineState(mPSOs["sky"].Get());
-		mInstanceManager->Draw(mCommandList.Get(), (int)RenderLayer::Sky);
+		gCommandList->SetPipelineState(gPSOs["sky"].Get());
+		gInstanceManager->Draw(gCommandList.Get(), (int)RenderLayer::Sky);
 	}
 
 	//
@@ -274,29 +237,25 @@ void D3D12App::Draw(const GameTimer& gt)
 		mMultiplyFilter->ExcuteInOut(mRenderTarget->Resource(), mShaderResourceTemp->Resource(), mRenderTarget->Resource());
 	}
 
-
 	//
 	// 转换回后缓冲渲染
 	//
 
 	// 改变资源状态
-	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+	gCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-	// 设置渲染目标
-	mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
-
-	mDrawQuad->Draw(mRenderTarget->Resource());
+	mDrawQuad->Draw(mRenderTarget->Resource(), CurrentBackBufferView(), DepthStencilView());
 
 	// 改变资源状态
-	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+	gCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
 	//关闭指令列表
-	ThrowIfFailed(mCommandList->Close());
+	ThrowIfFailed(gCommandList->Close());
 
 	//将指令列表添加进指令队列，供GPU执行
-	ID3D12CommandList* cmdsLists[] = { mCommandList.Get() };
+	ID3D12CommandList* cmdsLists[] = { gCommandList.Get() };
 	mCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
 	//交换前后缓冲
@@ -334,8 +293,8 @@ void D3D12App::OnMouseMove(WPARAM btnState, int x, int y)
 		float dx = XMConvertToRadians(0.25f * static_cast<float>(x - mLastMousePos.x));
 		float dy = XMConvertToRadians(0.25f * static_cast<float>(y - mLastMousePos.y));
 
-		mCamera->Pitch(dy);
-		mCamera->RotateY(dx);
+		gCamera->Pitch(dy);
+		gCamera->RotateY(dx);
 	}
 
 	mLastMousePos.x = x;
@@ -371,46 +330,46 @@ void D3D12App::OnKeyDown(WPARAM vkCode)
 	}
 
 	if (vkCode == '6') {
-		mCamera->mFrustumCullingEnabled = !mCamera->mFrustumCullingEnabled;
+		gCamera->mFrustumCullingEnabled = !gCamera->mFrustumCullingEnabled;
 	}
 
-	mInputManager->OnKeyDown(vkCode);
+	gInputManager->OnKeyDown(vkCode);
 }
 
 void D3D12App::OnKeyUp(WPARAM vkCode)
 {
-	mInputManager->OnKeyUp(vkCode);
+	gInputManager->OnKeyUp(vkCode);
 }
 
-void D3D12App::OnKeyboardInput(const GameTimer& gt)
+void D3D12App::OnKeyboardInput()
 {
-	const float dt = gt.DeltaTime();
+	const float dt = gTimer.DeltaTime();
 
 	if (GetAsyncKeyState('W') & 0x8000)
-		mCamera->Walk(10.0f * dt);
+		gCamera->Walk(10.0f * dt);
 
 	if (GetAsyncKeyState('S') & 0x8000)
-		mCamera->Walk(-10.0f * dt);
+		gCamera->Walk(-10.0f * dt);
 
 	if (GetAsyncKeyState('A') & 0x8000)
-		mCamera->Strafe(-10.0f * dt);
+		gCamera->Strafe(-10.0f * dt);
 
 	if (GetAsyncKeyState('D') & 0x8000)
-		mCamera->Strafe(10.0f * dt);
+		gCamera->Strafe(10.0f * dt);
 
 	if (GetAsyncKeyState('Q') & 0x8000)
-		mCamera->FlyUp(10.0f * dt);
+		gCamera->FlyUp(10.0f * dt);
 
 	if (GetAsyncKeyState('E') & 0x8000)
-		mCamera->FlyDown(10.0f * dt);
+		gCamera->FlyDown(10.0f * dt);
 }
 
-void D3D12App::UpdateFrameResource(const GameTimer& gt)
+void D3D12App::UpdateFrameResource()
 {
 	PassConstants mainPassCB;
 
-	XMMATRIX view = mCamera->GetView();
-	XMMATRIX proj = mCamera->GetProj();
+	XMMATRIX view = gCamera->GetView();
+	XMMATRIX proj = gCamera->GetProj();
 
 	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
 	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
@@ -427,13 +386,13 @@ void D3D12App::UpdateFrameResource(const GameTimer& gt)
 	XMStoreFloat4x4(&mainPassCB.InvViewProj, XMMatrixTranspose(invViewProj));
 	XMStoreFloat4x4(&mainPassCB.ShadowTransform, XMMatrixTranspose(shadowTransform));
 
-	mainPassCB.EyePosW = mCamera->GetPosition3f();
-	mainPassCB.RenderTargetSize = XMFLOAT2((float)mClientWidth, (float)mClientHeight);
-	mainPassCB.InvRenderTargetSize = XMFLOAT2(1.0f / mClientWidth, 1.0f / mClientHeight);
+	mainPassCB.EyePosW = gCamera->GetPosition3f();
+	mainPassCB.RenderTargetSize = XMFLOAT2((float)gClientWidth, (float)gClientHeight);
+	mainPassCB.InvRenderTargetSize = XMFLOAT2(1.0f / gClientWidth, 1.0f / gClientHeight);
 	mainPassCB.NearZ = 1.0f;
 	mainPassCB.FarZ = 1000.0f;
-	mainPassCB.TotalTime = gt.TotalTime();
-	mainPassCB.DeltaTime = gt.DeltaTime();
+	mainPassCB.TotalTime = gTimer.TotalTime();
+	mainPassCB.DeltaTime = gTimer.DeltaTime();
 	mainPassCB.AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
 	mainPassCB.Lights[0].Direction = mRotatedLightDirections[0];
 	mainPassCB.Lights[0].Strength = { 0.9f, 0.8f, 0.7f };
@@ -442,71 +401,45 @@ void D3D12App::UpdateFrameResource(const GameTimer& gt)
 	mainPassCB.Lights[2].Direction = mRotatedLightDirections[2];
 	mainPassCB.Lights[2].Strength = { 0.2f, 0.2f, 0.2f };
 
-	mPassCB->Copy(0, mainPassCB);
+	gPassCB->Copy(0, mainPassCB);
 
 	mCubeMap->UpdatePassConstantsData(mainPassCB);
 }
 
 void D3D12App::BuildManagers()
 {
-	mCommonResource = std::make_shared<CommonResource>();
-
-	mTextureManager = std::make_shared<TextureManager>(md3dDevice.Get(), mCommandList.Get(), mCbvSrvUavDescriptorSize);
-
-	mMaterialManager = std::make_shared<MaterialManager>(md3dDevice.Get());
-
-	mMeshManager = std::make_shared<MeshManager>(md3dDevice.Get(), mCommandList.Get());
-
-	mInstanceManager = std::make_shared<InstanceManager>(md3dDevice.Get(), mCommonResource);
-
-	mGameObjectManager = std::make_shared<GameObjectManager>(mCommonResource);
-
-	mInputManager = std::make_shared<InputManager>();
-
-	mCommonResource->mTextureManager = mTextureManager;
-	mCommonResource->mMaterialManager = mMaterialManager;
-	mCommonResource->mMeshManager = mMeshManager;
-	mCommonResource->mInstanceManager = mInstanceManager;
-	mCommonResource->mGameObjectManager = mGameObjectManager;
-	mCommonResource->mInputManager = mInputManager;
-	mCommonResource->mCamera = mCamera;
+	gTextureManager->Initialize(gD3D12Device.Get(), gCommandList.Get(), gCbvSrvUavDescriptorSize);
+	gMaterialManager->Initialize(gD3D12Device.Get());
+	gMeshManager->Initialize(gD3D12Device.Get(), gCommandList.Get());
+	gInstanceManager->Initialize(gD3D12Device.Get());
+	gGameObjectManager->Initialize();
+	gInputManager->Initialize();
 }
 
-void D3D12App::BuildEffects()
+void D3D12App::BuildRenders()
 {
-	mRenderTarget = std::make_unique<RenderTarget>(md3dDevice.Get(),
-		mClientWidth, mClientHeight, mBackBufferFormat);
+	mDrawQuad = std::make_unique<DrawQuad>(gClientWidth, gClientHeight, gBackBufferFormat);
+	mRenderTarget = std::make_unique<RenderTarget>(gClientWidth, gClientHeight, gBackBufferFormat);
+	mShaderResourceTemp = std::make_unique<ShaderResource>(gClientWidth, gClientHeight, gBackBufferFormat);
 
-	mShaderResourceTemp = std::make_unique<ShaderResource>(md3dDevice.Get(),
-		mClientWidth, mClientHeight, mBackBufferFormat);
+	mWireframe = std::make_unique<Wireframe>();
+	mDepthComplexityUseStencil = std::make_unique<DepthComplexityUseStencil>();
+	mDepthComplexityUseBlend = std::make_unique<DepthComplexityUseBlend>();
+}
 
-	mDrawQuad = std::make_unique<DrawQuad>(md3dDevice.Get(), mCommandList.Get(),
-		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
+void D3D12App::BuildFilters()
+{
+	mBlurFilter = std::make_unique<BlurFilter>(gClientWidth, gClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
+	mSobelFilter = std::make_unique<SobelFilter>(gClientWidth, gClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
+	mInverseFilter = std::make_unique<InverseFilter>(gClientWidth, gClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
+	mMultiplyFilter = std::make_unique<MultiplyFilter>(gClientWidth, gClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
 
-	mWireframe = std::make_unique<Wireframe>(md3dDevice.Get(), mCommandList.Get());
-
-	mDepthComplexityUseStencil = std::make_unique<DepthComplexityUseStencil>(md3dDevice.Get(), mCommandList.Get());
-
-	mDepthComplexityUseBlend = std::make_unique<DepthComplexityUseBlend>(md3dDevice.Get(), mCommandList.Get());
-
-	mBlurFilter = std::make_unique<BlurFilter>(md3dDevice.Get(), mCommandList.Get(),
-		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
-
-	mSobelFilter = std::make_unique<SobelFilter>(md3dDevice.Get(), mCommandList.Get(),
-		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
-
-	mInverseFilter = std::make_unique<InverseFilter>(md3dDevice.Get(), mCommandList.Get(),
-		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
-
-	mMultiplyFilter = std::make_unique<MultiplyFilter>(md3dDevice.Get(), mCommandList.Get(),
-		mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, mCbvSrvUavDescriptorSize);
-
-	mCubeMap = std::make_unique<CubeMap>(md3dDevice.Get(), mCommandList.Get(),
-		DXGI_FORMAT_R8G8B8A8_UNORM, mDepthStencilFormat,
-		mCbvSrvUavDescriptorSize, mRtvDescriptorSize, mDsvDescriptorSize);
+	mCubeMap = std::make_unique<CubeMap>(gD3D12Device.Get(), gCommandList.Get(),
+		DXGI_FORMAT_R8G8B8A8_UNORM, gDepthStencilFormat,
+		gCbvSrvUavDescriptorSize, gRtvDescriptorSize, gDsvDescriptorSize);
 	mCubeMap->BuildCubeFaceCamera(0.0f, 2.0f, 0.0f);
 
-	mShadowMap = std::make_unique<ShadowMap>(md3dDevice.Get(), mCommandList.Get(), 2048, 2048);
+	mShadowMap = std::make_unique<ShadowMap>(gD3D12Device.Get(), gCommandList.Get(), 2048, 2048);
 	// 手动设置场景的包围球
 	// 通常需要迭代所有的顶点来计算包围球
 	BoundingSphere sceneBounds;
@@ -539,162 +472,162 @@ void D3D12App::BuildTextures()
 	std::wstring cubeMapFileName = L"Textures/snowcube1024.dds";
 
 	for (auto fileName : fileNames) {
-		mTextureManager->AddTextureTex(fileName);
+		gTextureManager->AddTextureTex(fileName);
 	}
-	mTextureManager->AddTextureCube(cubeMapFileName);
+	gTextureManager->AddTextureCube(cubeMapFileName);
 
-	mTextureManager->BuildDescriptorHeaps();
+	gTextureManager->BuildDescriptorHeaps();
 }
 
 void D3D12App::BuildMaterials()
 {
 	MaterialData bricks;
-	bricks.DiffuseMapIndex = mTextureManager->GetIndex("bricks");
-	bricks.NormalMapIndex = mTextureManager->GetIndex("bricks_nmap");
+	bricks.DiffuseMapIndex = gTextureManager->GetIndex("bricks");
+	bricks.NormalMapIndex = gTextureManager->GetIndex("bricks_nmap");
 	bricks.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	bricks.FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
 	bricks.Roughness = 0.3f;
-	mMaterialManager->AddMaterial("bricks", bricks);
+	gMaterialManager->AddMaterial("bricks", bricks);
 
 	MaterialData bricks2;
-	bricks2.DiffuseMapIndex = mTextureManager->GetIndex("bricks2");
-	bricks2.NormalMapIndex = mTextureManager->GetIndex("bricks2_nmap");
+	bricks2.DiffuseMapIndex = gTextureManager->GetIndex("bricks2");
+	bricks2.NormalMapIndex = gTextureManager->GetIndex("bricks2_nmap");
 	bricks2.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	bricks2.FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	bricks2.Roughness = 0.3f;
-	mMaterialManager->AddMaterial("bricks2", bricks2);
+	gMaterialManager->AddMaterial("bricks2", bricks2);
 
 	MaterialData stone;
-	stone.DiffuseMapIndex = mTextureManager->GetIndex("stone");
+	stone.DiffuseMapIndex = gTextureManager->GetIndex("stone");
 	stone.NormalMapIndex = -1;
 	stone.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	stone.FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
 	stone.Roughness = 0.1f;
-	mMaterialManager->AddMaterial("stone", stone);
+	gMaterialManager->AddMaterial("stone", stone);
 
 	MaterialData tile;
-	tile.DiffuseMapIndex = mTextureManager->GetIndex("tile");
-	tile.NormalMapIndex = mTextureManager->GetIndex("tile_nmap");
+	tile.DiffuseMapIndex = gTextureManager->GetIndex("tile");
+	tile.NormalMapIndex = gTextureManager->GetIndex("tile_nmap");
 	tile.DiffuseAlbedo = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);
 	tile.FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	tile.Roughness = 0.1f;
-	mMaterialManager->AddMaterial("tile", tile);
+	gMaterialManager->AddMaterial("tile", tile);
 
 	MaterialData mirror0;
-	mirror0.DiffuseMapIndex = mTextureManager->GetIndex("white1x1");
-	mirror0.NormalMapIndex = mTextureManager->GetIndex("default_nmap");
+	mirror0.DiffuseMapIndex = gTextureManager->GetIndex("white1x1");
+	mirror0.NormalMapIndex = gTextureManager->GetIndex("default_nmap");
 	mirror0.DiffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
 	mirror0.FresnelR0 = XMFLOAT3(0.98f, 0.97f, 0.95f);
 	mirror0.Roughness = 0.1f;
-	mMaterialManager->AddMaterial("mirror", mirror0);
+	gMaterialManager->AddMaterial("mirror", mirror0);
 
 	MaterialData sky;
-	sky.DiffuseMapIndex = mTextureManager->GetCubeIndex();
+	sky.DiffuseMapIndex = gTextureManager->GetCubeIndex();
 	sky.NormalMapIndex = -1;
 	sky.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	sky.FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	sky.Roughness = 1.0f;
-	mMaterialManager->AddMaterial("sky", sky);
+	gMaterialManager->AddMaterial("sky", sky);
 
 	MaterialData grass;
-	grass.DiffuseMapIndex = mTextureManager->GetIndex("grass");
+	grass.DiffuseMapIndex = gTextureManager->GetIndex("grass");
 	grass.NormalMapIndex = -1;
 	grass.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	grass.FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
 	grass.Roughness = 0.125f;
-	mMaterialManager->AddMaterial("grass", grass);
+	gMaterialManager->AddMaterial("grass", grass);
 
 	MaterialData water;
-	water.DiffuseMapIndex = mTextureManager->GetIndex("water1");
+	water.DiffuseMapIndex = gTextureManager->GetIndex("water1");
 	water.NormalMapIndex = -1;
 	water.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f);
 	water.FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	water.Roughness = 0.0f;
-	mMaterialManager->AddMaterial("water", water);
+	gMaterialManager->AddMaterial("water", water);
 
 	MaterialData wirefence;
-	wirefence.DiffuseMapIndex = mTextureManager->GetIndex("WireFence");
+	wirefence.DiffuseMapIndex = gTextureManager->GetIndex("WireFence");
 	wirefence.NormalMapIndex = -1;
 	wirefence.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	wirefence.FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	wirefence.Roughness = 0.25f;
-	mMaterialManager->AddMaterial("wirefence", wirefence);
+	gMaterialManager->AddMaterial("wirefence", wirefence);
 
 	MaterialData ice;
-	ice.DiffuseMapIndex = mTextureManager->GetIndex("ice");
+	ice.DiffuseMapIndex = gTextureManager->GetIndex("ice");
 	ice.NormalMapIndex = -1;
 	ice.DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	ice.FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	ice.Roughness = 0.0f;
-	mMaterialManager->AddMaterial("ice", ice);
+	gMaterialManager->AddMaterial("ice", ice);
 
 	MaterialData skullMat;
-	skullMat.DiffuseMapIndex = mTextureManager->GetIndex("white1x1");
+	skullMat.DiffuseMapIndex = gTextureManager->GetIndex("white1x1");
 	skullMat.NormalMapIndex = -1;
 	skullMat.DiffuseAlbedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
 	skullMat.FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	skullMat.Roughness = 0.2f;
-	mMaterialManager->AddMaterial("skullMat", skullMat);
+	gMaterialManager->AddMaterial("skullMat", skullMat);
 }
 
 void D3D12App::BuildMeshes()
 {
 	GeometryGenerator geoGen;
-	mMeshManager->AddMesh("box", geoGen.CreateBox(1.0f, 1.0f, 1.0f, 3));
-	mMeshManager->AddMesh("grid", geoGen.CreateGrid(20.0f, 30.0f, 60, 40));
-	mMeshManager->AddMesh("sphere", geoGen.CreateSphere(0.5f, 20, 20));
-	mMeshManager->AddMesh("cylinder", geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20));
-	mMeshManager->AddMesh("box2", geoGen.CreateBox(8.0f, 8.0f, 8.0f, 3));
+	gMeshManager->AddMesh("box", geoGen.CreateBox(1.0f, 1.0f, 1.0f, 3));
+	gMeshManager->AddMesh("grid", geoGen.CreateGrid(20.0f, 30.0f, 60, 40));
+	gMeshManager->AddMesh("sphere", geoGen.CreateSphere(0.5f, 20, 20));
+	gMeshManager->AddMesh("cylinder", geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20));
+	gMeshManager->AddMesh("box2", geoGen.CreateBox(8.0f, 8.0f, 8.0f, 3));
 }
 
 void D3D12App::BuildGameObjects()
 {
-	auto sky = std::make_unique<Sky>(mCommonResource);
-	mGameObjectManager->AddGameObject(std::move(sky));
+	auto sky = std::make_unique<Sky>();
+	gGameObjectManager->AddGameObject(std::move(sky));
 
-	auto box = std::make_unique<Box>(mCommonResource);
-	mGameObjectManager->AddGameObject(std::move(box));
+	auto box = std::make_unique<Box>();
+	gGameObjectManager->AddGameObject(std::move(box));
 
-	auto globe = std::make_unique<Globe>(mCommonResource);
-	mGameObjectManager->AddGameObject(std::move(globe));
+	auto globe = std::make_unique<Globe>();
+	gGameObjectManager->AddGameObject(std::move(globe));
 
-	auto grid = std::make_unique<Grid>(mCommonResource);
-	mGameObjectManager->AddGameObject(std::move(grid));
+	auto grid = std::make_unique<Grid>();
+	gGameObjectManager->AddGameObject(std::move(grid));
 
 	for (int i = 0; i < 5; ++i) {
-		auto leftCyl = std::make_unique<Cylinder>(mCommonResource);
+		auto leftCyl = std::make_unique<Cylinder>();
 		leftCyl->mGameObjectName = "leftCyl" + std::to_string(i);
 		leftCyl->mTranslation = XMFLOAT3(-5.0f, 1.5f, -10.0f + i * 5.0f);
-		mGameObjectManager->AddGameObject(std::move(leftCyl));
+		gGameObjectManager->AddGameObject(std::move(leftCyl));
 
-		auto rightCyl = std::make_unique<Cylinder>(mCommonResource);
+		auto rightCyl = std::make_unique<Cylinder>();
 		rightCyl->mGameObjectName = "rightCyl" + std::to_string(i);
 		rightCyl->mTranslation = XMFLOAT3(+5.0f, 1.5f, -10.0f + i * 5.0f);
-		mGameObjectManager->AddGameObject(std::move(rightCyl));
+		gGameObjectManager->AddGameObject(std::move(rightCyl));
 
-		auto leftSphere = std::make_unique<Sphere>(mCommonResource);
+		auto leftSphere = std::make_unique<Sphere>();
 		leftSphere->mGameObjectName = "leftSphere" + std::to_string(i);
 		leftSphere->mTranslation = XMFLOAT3(-5.0f, 3.5f, -10.0f + i * 5.0f);
-		mGameObjectManager->AddGameObject(std::move(leftSphere));
+		gGameObjectManager->AddGameObject(std::move(leftSphere));
 
-		auto rightSphere = std::make_unique<Sphere>(mCommonResource);
+		auto rightSphere = std::make_unique<Sphere>();
 		rightSphere->mGameObjectName = "rightSphere" + std::to_string(i);
 		rightSphere->mTranslation = XMFLOAT3(+5.0f, 3.5f, -10.0f + i * 5.0f);
-		mGameObjectManager->AddGameObject(std::move(rightSphere));
+		gGameObjectManager->AddGameObject(std::move(rightSphere));
 	}
 
-	auto hill = std::make_unique<Hill>(mCommonResource);
-	mGameObjectManager->AddGameObject(std::move(hill));
+	auto hill = std::make_unique<Hill>();
+	gGameObjectManager->AddGameObject(std::move(hill));
 
-	auto wave = std::make_unique<Wave>(mCommonResource);
-	wave->SetWavesVB(md3dDevice.Get());
-	mGameObjectManager->AddGameObject(std::move(wave));
+	auto wave = std::make_unique<Wave>();
+	wave->SetWavesVB(gD3D12Device.Get());
+	gGameObjectManager->AddGameObject(std::move(wave));
 
-	auto wirefenceBox = std::make_unique<WirefenceBox>(mCommonResource);
-	mGameObjectManager->AddGameObject(std::move(wirefenceBox));
+	auto wirefenceBox = std::make_unique<WirefenceBox>();
+	gGameObjectManager->AddGameObject(std::move(wirefenceBox));
 
-	auto skull = std::make_unique<Skull>(mCommonResource);
-	mGameObjectManager->AddGameObject(std::move(skull));
+	auto skull = std::make_unique<Skull>();
+	gGameObjectManager->AddGameObject(std::move(skull));
 }
 
 void D3D12App::BuildRootSignature()
@@ -706,7 +639,7 @@ void D3D12App::BuildRootSignature()
 	texShadowMap.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
 
 	CD3DX12_DESCRIPTOR_RANGE texTable;
-	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, mTextureManager->GetMaxNumTextures(), 2, 0);
+	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, gTextureManager->GetMaxNumTextures(), 2, 0);
 
 	CD3DX12_ROOT_PARAMETER slotRootParameter[6];
 
@@ -733,14 +666,14 @@ void D3D12App::BuildRootSignature()
 	}
 	ThrowIfFailed(hr);
 
-	ThrowIfFailed(md3dDevice->CreateRootSignature(
+	ThrowIfFailed(gD3D12Device->CreateRootSignature(
 		0,
 		serializedRootSig->GetBufferPointer(),
 		serializedRootSig->GetBufferSize(),
-		IID_PPV_ARGS(mRootSignature.GetAddressOf())));
+		IID_PPV_ARGS(gRootSignatures["main"].GetAddressOf())));
 }
 
-void D3D12App::BuildShadersAndInputLayout()
+void D3D12App::BuildShaders()
 {
 	const D3D_SHADER_MACRO defines[] =
 	{
@@ -755,26 +688,15 @@ void D3D12App::BuildShadersAndInputLayout()
 		NULL, NULL
 	};
 
-	mShaders["standardVS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["opaquePS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", defines, "PS", "ps_5_1");
-	mShaders["alphaTestedPS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
+	gShaders["standardVS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", nullptr, "VS", "vs_5_1");
+	gShaders["opaquePS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", defines, "PS", "ps_5_1");
+	gShaders["alphaTestedPS"] = d3dUtil::CompileShader(L"Shaders\\Default.hlsl", alphaTestDefines, "PS", "ps_5_1");
 
-	mShaders["UIVS"] = d3dUtil::CompileShader(L"Shaders\\UI.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["UIPS"] = d3dUtil::CompileShader(L"Shaders\\UI.hlsl", nullptr, "PS", "ps_5_1");
+	gShaders["UIVS"] = d3dUtil::CompileShader(L"Shaders\\UI.hlsl", nullptr, "VS", "vs_5_1");
+	gShaders["UIPS"] = d3dUtil::CompileShader(L"Shaders\\UI.hlsl", nullptr, "PS", "ps_5_1");
 
-	mDrawQuad->SetShader(mShaders["UIVS"].Get(), mShaders["UIPS"].Get());
-	mDepthComplexityUseStencil->SetShader(mShaders["UIVS"].Get(), mShaders["UIPS"].Get());
-
-	mShaders["skyVS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "VS", "vs_5_1");
-	mShaders["skyPS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "PS", "ps_5_1");
-
-	mInputLayout =
-	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	};
+	gShaders["skyVS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "VS", "vs_5_1");
+	gShaders["skyPS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "PS", "ps_5_1");
 }
 
 void D3D12App::BuildPSOs()
@@ -784,17 +706,17 @@ void D3D12App::BuildPSOs()
 	//
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
 	ZeroMemory(&opaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
-	opaquePsoDesc.InputLayout = { mInputLayout.data(), (UINT)mInputLayout.size() };
-	opaquePsoDesc.pRootSignature = mRootSignature.Get();
+	opaquePsoDesc.InputLayout = { gInputLayout.data(), (UINT)gInputLayout.size() };
+	opaquePsoDesc.pRootSignature = gRootSignatures["main"].Get();
 	opaquePsoDesc.VS =
 	{
-		reinterpret_cast<BYTE*>(mShaders["standardVS"]->GetBufferPointer()),
-		mShaders["standardVS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(gShaders["standardVS"]->GetBufferPointer()),
+		gShaders["standardVS"]->GetBufferSize()
 	};
 	opaquePsoDesc.PS =
 	{
-		reinterpret_cast<BYTE*>(mShaders["opaquePS"]->GetBufferPointer()),
-		mShaders["opaquePS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(gShaders["opaquePS"]->GetBufferPointer()),
+		gShaders["opaquePS"]->GetBufferSize()
 	};
 	opaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	opaquePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
@@ -802,11 +724,11 @@ void D3D12App::BuildPSOs()
 	opaquePsoDesc.SampleMask = UINT_MAX;
 	opaquePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	opaquePsoDesc.NumRenderTargets = 1;
-	opaquePsoDesc.RTVFormats[0] = mBackBufferFormat;
-	opaquePsoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
-	opaquePsoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
-	opaquePsoDesc.DSVFormat = mDepthStencilFormat;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaque"])));
+	opaquePsoDesc.RTVFormats[0] = gBackBufferFormat;
+	opaquePsoDesc.SampleDesc.Count = g4xMsaaState ? 4 : 1;
+	opaquePsoDesc.SampleDesc.Quality = g4xMsaaState ? (g4xMsaaQuality - 1) : 0;
+	opaquePsoDesc.DSVFormat = gDepthStencilFormat;
+	ThrowIfFailed(gD3D12Device->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&gPSOs["opaque"])));
 
 	//
 	// 透明物体
@@ -826,7 +748,7 @@ void D3D12App::BuildPSOs()
 	transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 
 	transparentPsoDesc.BlendState.RenderTarget[0] = transparencyBlendDesc;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&mPSOs["transparent"])));
+	ThrowIfFailed(gD3D12Device->CreateGraphicsPipelineState(&transparentPsoDesc, IID_PPV_ARGS(&gPSOs["transparent"])));
 
 	//
 	// alpha测试物体
@@ -834,20 +756,12 @@ void D3D12App::BuildPSOs()
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC alphaTestedPsoDesc = opaquePsoDesc;
 	alphaTestedPsoDesc.PS =
 	{
-		reinterpret_cast<BYTE*>(mShaders["alphaTestedPS"]->GetBufferPointer()),
-		mShaders["alphaTestedPS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(gShaders["alphaTestedPS"]->GetBufferPointer()),
+		gShaders["alphaTestedPS"]->GetBufferSize()
 	};
 	alphaTestedPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(&mPSOs["alphaTested"])));
+	ThrowIfFailed(gD3D12Device->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(&gPSOs["alphaTested"])));
 
-	mDrawQuad->SetPSODesc(opaquePsoDesc);
-	mWireframe->SetPSODesc(opaquePsoDesc);
-	mDepthComplexityUseStencil->SetPSODesc(opaquePsoDesc);
-	mDepthComplexityUseBlend->SetPSODesc(opaquePsoDesc);
-	mBlurFilter->SetPSODesc(opaquePsoDesc);
-	mSobelFilter->SetPSODesc(opaquePsoDesc);
-	mInverseFilter->SetPSODesc(opaquePsoDesc);
-	mMultiplyFilter->SetPSODesc(opaquePsoDesc);
 	mShadowMap->SetPSODesc(opaquePsoDesc);
 
 	//
@@ -861,38 +775,38 @@ void D3D12App::BuildPSOs()
 	// 将深度函数从LESS改为LESS_EQUAL
 	// 否则，如果深度缓冲被清空为1，那么深度值z = 1的天空球将不会通过深度测试
 	skyPsoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-	skyPsoDesc.pRootSignature = mRootSignature.Get();
+	skyPsoDesc.pRootSignature = gRootSignatures["main"].Get();
 	skyPsoDesc.VS =
 	{
-		reinterpret_cast<BYTE*>(mShaders["skyVS"]->GetBufferPointer()),
-		mShaders["skyVS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(gShaders["skyVS"]->GetBufferPointer()),
+		gShaders["skyVS"]->GetBufferSize()
 	};
 	skyPsoDesc.PS =
 	{
-		reinterpret_cast<BYTE*>(mShaders["skyPS"]->GetBufferPointer()),
-		mShaders["skyPS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(gShaders["skyPS"]->GetBufferPointer()),
+		gShaders["skyPS"]->GetBufferSize()
 	};
-	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&skyPsoDesc, IID_PPV_ARGS(&mPSOs["sky"])));
+	ThrowIfFailed(gD3D12Device->CreateGraphicsPipelineState(&skyPsoDesc, IID_PPV_ARGS(&gPSOs["sky"])));
 }
 
 void D3D12App::Pick(int sx, int sy)
 {
-	XMFLOAT4X4 P = mCamera->GetProj4x4f();
+	XMFLOAT4X4 P = gCamera->GetProj4x4f();
 
 	// 计算视空间的选取射线
-	float vx = (+2.0f * sx / mClientWidth - 1.0f) / P(0, 0);
-	float vy = (-2.0f * sy / mClientHeight + 1.0f) / P(1, 1);
+	float vx = (+2.0f * sx / gClientWidth - 1.0f) / P(0, 0);
+	float vy = (-2.0f * sy / gClientHeight + 1.0f) / P(1, 1);
 
 	// 视空间的射线定义
 	XMVECTOR rayOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 	XMVECTOR rayDir = XMVectorSet(vx, vy, 1.0f, 0.0f);
 
 	// 将射线转换至世界空间
-	XMMATRIX V = mCamera->GetView();
+	XMMATRIX V = gCamera->GetView();
 	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(V), V);
 
 	XMVECTOR rayOriginW = XMVector3TransformCoord(rayOrigin, invView);
 	XMVECTOR rayDirW = XMVector3TransformNormal(rayDir, invView);
 
-	mInstanceManager->Pick(rayOriginW, rayDirW);
+	gInstanceManager->Pick(rayOriginW, rayDirW);
 }
