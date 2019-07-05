@@ -24,6 +24,12 @@ void CubeMap::SetShadow(ID3D12DescriptorHeap* srvDescriptorHeapPtr, CD3DX12_GPU_
 	mShadowSrv = srv;
 }
 
+void CubeMap::SetSsao(ID3D12DescriptorHeap* srvDescriptorHeapPtr, CD3DX12_GPU_DESCRIPTOR_HANDLE srv)
+{
+	mSsaoSrvDescriptorHeapPtr = srvDescriptorHeapPtr;
+	mSsaoSrv = srv;
+}
+
 CD3DX12_GPU_DESCRIPTOR_HANDLE CubeMap::Srv()
 {
 	return mhGpuSrv;
@@ -142,6 +148,11 @@ void CubeMap::DrawSceneToCubeMap()
 		gCommandList->SetDescriptorHeaps(_countof(descriptorHeapsShadow), descriptorHeapsShadow);
 		gCommandList->SetGraphicsRootDescriptorTable(5, mShadowSrv);
 
+		// 绑定Ssao
+		ID3D12DescriptorHeap* descriptorHeapsSsao[] = { mSsaoSrvDescriptorHeapPtr };
+		gCommandList->SetDescriptorHeaps(_countof(descriptorHeapsSsao), descriptorHeapsSsao);
+		gCommandList->SetGraphicsRootDescriptorTable(6, mSsaoSrv);
+
 		gCommandList->SetPipelineState(gPSOs["opaque"].Get());
 		gInstanceManager->Draw((int)RenderLayer::Opaque);
 
@@ -183,6 +194,31 @@ void CubeMap::BuildResource()
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		&CD3DX12_CLEAR_VALUE(mFormat, DirectX::Colors::LightSteelBlue),
 		IID_PPV_ARGS(&mCubeMap)));
+
+	D3D12_RESOURCE_DESC depthStencilDesc;
+	depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	depthStencilDesc.Alignment = 0;
+	depthStencilDesc.Width = mCubeMapSize;
+	depthStencilDesc.Height = mCubeMapSize;
+	depthStencilDesc.DepthOrArraySize = 1;
+	depthStencilDesc.MipLevels = 1;
+	depthStencilDesc.Format = mDepthStencilFormat;
+	depthStencilDesc.SampleDesc.Count = 1;
+	depthStencilDesc.SampleDesc.Quality = 0;
+	depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+	D3D12_CLEAR_VALUE optClear;
+	optClear.Format = mDepthStencilFormat;
+	optClear.DepthStencil.Depth = 1.0f;
+	optClear.DepthStencil.Stencil = 0;
+	ThrowIfFailed(gD3D12Device->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		D3D12_HEAP_FLAG_NONE,
+		&depthStencilDesc,
+		D3D12_RESOURCE_STATE_DEPTH_WRITE,
+		&optClear,
+		IID_PPV_ARGS(mCubeDepthStencilBuffer.GetAddressOf())));
 }
 
 void CubeMap::BuildDescriptor()
@@ -257,32 +293,6 @@ void CubeMap::BuildDescriptor()
 		&dsvHeapDesc, IID_PPV_ARGS(mDsvHeap.GetAddressOf())));
 
 	mhCubeDSV = CD3DX12_CPU_DESCRIPTOR_HANDLE(mDsvHeap->GetCPUDescriptorHandleForHeapStart(), 0, gDsvDescriptorSize);
-
-	// 创建深度模板缓冲和视图
-	D3D12_RESOURCE_DESC depthStencilDesc;
-	depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	depthStencilDesc.Alignment = 0;
-	depthStencilDesc.Width = mCubeMapSize;
-	depthStencilDesc.Height = mCubeMapSize;
-	depthStencilDesc.DepthOrArraySize = 1;
-	depthStencilDesc.MipLevels = 1;
-	depthStencilDesc.Format = mDepthStencilFormat;
-	depthStencilDesc.SampleDesc.Count = 1;
-	depthStencilDesc.SampleDesc.Quality = 0;
-	depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-	D3D12_CLEAR_VALUE optClear;
-	optClear.Format = mDepthStencilFormat;
-	optClear.DepthStencil.Depth = 1.0f;
-	optClear.DepthStencil.Stencil = 0;
-	ThrowIfFailed(gD3D12Device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-		D3D12_HEAP_FLAG_NONE,
-		&depthStencilDesc,
-		D3D12_RESOURCE_STATE_DEPTH_WRITE,
-		&optClear,
-		IID_PPV_ARGS(mCubeDepthStencilBuffer.GetAddressOf())));
 
 	// 创建深度模板视图
 	gD3D12Device->CreateDepthStencilView(mCubeDepthStencilBuffer.Get(), nullptr, mhCubeDSV);

@@ -12,7 +12,8 @@ struct VertexOut
 {
 	float4 PosH    : SV_POSITION;
 	float4 ShadowPosH : POSITION0;
-    float3 PosW    : POSITION1;
+	float4 SsaoPosH   : POSITION1;
+    float3 PosW    : POSITION2;
     float3 NormalW : NORMAL;
 	float3 TangentW : TANGENT;
 	float2 TexC    : TEXCOORD;
@@ -58,6 +59,9 @@ VertexOut VS(VertexIn vin, uint instanceID : SV_InstanceID)
 	// 计算投影纹理坐标
 	vout.ShadowPosH = mul(posW, gShadowTransform);
 
+	// 产生投影纹理坐标，将ssao贴图映射至屏幕
+	vout.SsaoPosH = mul(posW, gViewProjTex);
+
     return vout;
 }
 
@@ -95,8 +99,12 @@ float4 PS(VertexOut pin) : SV_Target
 	float distToEye = length(toEyeW);
 	toEyeW /= distToEye; // 单位化
 
+	// 完成纹理投影并采样ssao贴图
+	pin.SsaoPosH /= pin.SsaoPosH.w;
+	float ambientAccess = gSsaoMap.Sample(gsamLinearClamp, pin.SsaoPosH.xy, 0.0f).r;
+
 	// 环境光
-    float4 ambient = gAmbientLight* diffuseAlbedo;
+    float4 ambient = ambientAccess * gAmbientLight* diffuseAlbedo;
 
 	// 只有第一个光源产生阴影
 	float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);

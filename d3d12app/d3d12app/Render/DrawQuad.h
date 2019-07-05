@@ -11,6 +11,8 @@ public:
 	DrawQuad& operator=(const DrawQuad& rhs) = delete;
 	~DrawQuad() = default;
 
+	void OnResize(UINT newWidth, UINT newHeight);
+
 	void CopyIn(ID3D12Resource* input);
 	void Draw(const D3D12_CPU_DESCRIPTOR_HANDLE& rtv, const D3D12_CPU_DESCRIPTOR_HANDLE& dsv);
 	void Draw(ID3D12Resource* input, const D3D12_CPU_DESCRIPTOR_HANDLE& rtv, const D3D12_CPU_DESCRIPTOR_HANDLE& dsv);
