@@ -25,6 +25,7 @@ public:
 	~CubeMap() = default;
 
 	void SetShadow(ID3D12DescriptorHeap* srvDescriptorHeapPtr, CD3DX12_GPU_DESCRIPTOR_HANDLE srv);
+	void SetSsao(ID3D12DescriptorHeap* srvDescriptorHeapPtr, CD3DX12_GPU_DESCRIPTOR_HANDLE srv);
 
 	CD3DX12_GPU_DESCRIPTOR_HANDLE Srv();
 	ID3D12DescriptorHeap* GetSrvDescriptorHeapPtr();
@@ -68,4 +69,7 @@ private:
 
 	ID3D12DescriptorHeap* mShadowSrvDescriptorHeapPtr;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE mShadowSrv;
+
+	ID3D12DescriptorHeap* mSsaoSrvDescriptorHeapPtr;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE mSsaoSrv;
 };

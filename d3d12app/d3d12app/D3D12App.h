@@ -23,6 +23,7 @@
 #include "Render/ShaderResource.h"
 #include "Render/CubeMap.h"
 #include "Render/ShadowMap.h"
+#include "Render/Ssao.h"
 
 #include "Filter/BlurFilter.h"
 #include "Filter/SobelFilter.h"
@@ -116,6 +117,7 @@ private:
 
 	std::unique_ptr<CubeMap> mCubeMap = nullptr;
 	std::unique_ptr<ShadowMap> mShadowMap = nullptr;
+	std::unique_ptr<Ssao> mSsao = nullptr;
 
 	//
 	// Filter

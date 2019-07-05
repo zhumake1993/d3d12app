@@ -63,6 +63,15 @@
     <FxCompile Include="Shaders\Wireframe.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
+    <FxCompile Include="Shaders\DrawNormals.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Ssao.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\SsaoBlur.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D3D12App.cpp">
@@ -186,6 +195,9 @@
       <Filter>Render</Filter>
     </ClCompile>
     <ClCompile Include="Render\MainRender.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\Ssao.cpp">
       <Filter>Render</Filter>
     </ClCompile>
   </ItemGroup>
@@ -314,6 +326,9 @@
       <Filter>Render</Filter>
     </ClInclude>
     <ClInclude Include="Render\MainRender.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Ssao.h">
       <Filter>Render</Filter>
     </ClInclude>
   </ItemGroup>

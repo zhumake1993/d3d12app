@@ -5,8 +5,6 @@
 #include "../Manager/InstanceManager.h"
 #include "../Manager/TextureManager.h"
 
-using Microsoft::WRL::ComPtr;
-
 class ShadowMap
 {
 public:

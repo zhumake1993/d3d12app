@@ -13,6 +13,17 @@ DrawQuad::DrawQuad(UINT width, UINT height, DXGI_FORMAT format)
 	BuildPSO();
 }
 
+void DrawQuad::OnResize(UINT newWidth, UINT newHeight)
+{
+	if (mWidth != newWidth || mHeight != newHeight) {
+		mWidth = newWidth;
+		mHeight = newHeight;
+
+		BuildResource();
+		BuildDescriptor();
+	}
+}
+
 void DrawQuad::CopyIn(ID3D12Resource* input)
 {
 	gCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(input,

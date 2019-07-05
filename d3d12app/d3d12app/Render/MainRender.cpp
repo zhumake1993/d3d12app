@@ -19,6 +19,12 @@ void MainRender::SetCubeMap(ID3D12DescriptorHeap* srvDescriptorHeapPtr, CD3DX12_
 	mCubeMapSrv = srv;
 }
 
+void MainRender::SetSsao(ID3D12DescriptorHeap* srvDescriptorHeapPtr, CD3DX12_GPU_DESCRIPTOR_HANDLE srv)
+{
+	mSsaoSrvDescriptorHeapPtr = srvDescriptorHeapPtr;
+	mSsaoSrv = srv;
+}
+
 void MainRender::Draw(const CD3DX12_CPU_DESCRIPTOR_HANDLE& rtv, const D3D12_CPU_DESCRIPTOR_HANDLE& dsv)
 {
 	//设置视口和剪裁矩形。每次重置指令列表后都要设置视口和剪裁矩形
@@ -58,6 +64,11 @@ void MainRender::Draw(const CD3DX12_CPU_DESCRIPTOR_HANDLE& rtv, const D3D12_CPU_
 	gCommandList->SetDescriptorHeaps(_countof(descriptorHeapsShadow), descriptorHeapsShadow);
 	gCommandList->SetGraphicsRootDescriptorTable(5, mShadowSrv);
 
+	// 绑定Ssao
+	ID3D12DescriptorHeap* descriptorHeapsSsao[] = { mSsaoSrvDescriptorHeapPtr };
+	gCommandList->SetDescriptorHeaps(_countof(descriptorHeapsSsao), descriptorHeapsSsao);
+	gCommandList->SetGraphicsRootDescriptorTable(6, mSsaoSrv);
+
 	gCommandList->SetPipelineState(gPSOs["opaque"].Get());
 	gInstanceManager->Draw((int)RenderLayer::Opaque);
 
@@ -83,7 +94,7 @@ void MainRender::Draw(const CD3DX12_CPU_DESCRIPTOR_HANDLE& rtv, const D3D12_CPU_
 void MainRender::BuildRootSignature()
 {
 	CD3DX12_DESCRIPTOR_RANGE texTable;
-	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, gTextureManager->GetMaxNumTextures(), 2, 0);
+	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, gTextureManager->GetMaxNumTextures(), 3, 0);
 
 	CD3DX12_DESCRIPTOR_RANGE texCubeMap;
 	texCubeMap.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
@@ -91,7 +102,10 @@ void MainRender::BuildRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE texShadowMap;
 	texShadowMap.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
 
-	CD3DX12_ROOT_PARAMETER slotRootParameter[6];
+	CD3DX12_DESCRIPTOR_RANGE texSsaoMap;
+	texSsaoMap.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0);
+
+	CD3DX12_ROOT_PARAMETER slotRootParameter[7];
 
 	slotRootParameter[0].InitAsShaderResourceView(0, 1); // 结构化缓冲InstanceData
 	slotRootParameter[1].InitAsConstantBufferView(1); // 常量缓冲PassConstants
@@ -99,6 +113,7 @@ void MainRender::BuildRootSignature()
 	slotRootParameter[3].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL); // 纹理
 	slotRootParameter[4].InitAsDescriptorTable(1, &texCubeMap, D3D12_SHADER_VISIBILITY_PIXEL); // 立方体贴图
 	slotRootParameter[5].InitAsDescriptorTable(1, &texShadowMap, D3D12_SHADER_VISIBILITY_PIXEL); // 阴影贴图
+	slotRootParameter[6].InitAsDescriptorTable(1, &texSsaoMap, D3D12_SHADER_VISIBILITY_PIXEL); // Ssao贴图
 
 	auto staticSamplers = d3dUtil::GetStaticSamplers();
 

@@ -113,17 +113,25 @@ void D3D12App::Draw()
 		mInverseFilter->ExcuteInOut(mRenderTarget->Resource(), mRenderTarget->Resource());
 	}
 	else {
-		// 绘制阴影时要关闭平截头剔除
+		// 关闭平截头剔除
 		gCamera->mFrustumCullingEnabled = false;
+
 		mShadowMap->DrawSceneToShadowMap();
 
-		// 绘制动态立方体贴图时要关闭平截头剔除
-		gCamera->mFrustumCullingEnabled = false;
+		mSsao->DrawNormalsAndDepth();
+		mSsao->ComputeSsao(3);
+
 		mCubeMap->SetShadow(mShadowMap->GetSrvDescriptorHeapPtr(), mShadowMap->Srv());
+		// 这里直接使用该Ssao贴图是有问题的
+		// 因为该Ssao贴图的计算是基于主摄像机，而非cubemap的6个摄像机
+		// 正确的做法是基于cubemap的6个摄像机计算出6个不同的Ssao贴图
+		// 这里做近似处理，直接使用该Ssao贴图
+		mCubeMap->SetSsao(mSsao->GetSrvDescriptorHeapPtr(), mSsao->Srv());
 		mCubeMap->DrawSceneToCubeMap();
 
 		mMainRender->SetShadow(mShadowMap->GetSrvDescriptorHeapPtr(), mShadowMap->Srv());
 		mMainRender->SetCubeMap(mCubeMap->GetSrvDescriptorHeapPtr(), mCubeMap->Srv());
+		mMainRender->SetSsao(mSsao->GetSrvDescriptorHeapPtr(), mSsao->Srv());
 		mMainRender->Draw(mRenderTarget->Rtv(), DepthStencilView());
 	}
 
@@ -280,6 +288,13 @@ void D3D12App::UpdateFrameResource()
 	XMMATRIX invProj = XMMatrixInverse(&XMMatrixDeterminant(proj), proj);
 	XMMATRIX invViewProj = XMMatrixInverse(&XMMatrixDeterminant(viewProj), viewProj);
 
+	// 将NDC空间[-1,+1]^2转换至纹理空间[0,1]^2
+	XMMATRIX T(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, 0.5f, 0.0f, 1.0f);
+	XMMATRIX viewProjTex = XMMatrixMultiply(viewProj, T);
 	XMMATRIX shadowTransform = XMLoadFloat4x4(&mShadowMap->GetShadowTransform());
 
 	XMStoreFloat4x4(&mainPassCB.View, XMMatrixTranspose(view));
@@ -288,6 +303,7 @@ void D3D12App::UpdateFrameResource()
 	XMStoreFloat4x4(&mainPassCB.InvProj, XMMatrixTranspose(invProj));
 	XMStoreFloat4x4(&mainPassCB.ViewProj, XMMatrixTranspose(viewProj));
 	XMStoreFloat4x4(&mainPassCB.InvViewProj, XMMatrixTranspose(invViewProj));
+	XMStoreFloat4x4(&mainPassCB.ViewProjTex, XMMatrixTranspose(viewProjTex));
 	XMStoreFloat4x4(&mainPassCB.ShadowTransform, XMMatrixTranspose(shadowTransform));
 
 	mainPassCB.EyePosW = gCamera->GetPosition3f();
@@ -308,6 +324,7 @@ void D3D12App::UpdateFrameResource()
 	gPassCB->Copy(0, mainPassCB);
 
 	mCubeMap->UpdatePassConstantsData(mainPassCB);
+	mSsao->UpdateSsaoConstantData(mainPassCB);
 }
 
 void D3D12App::BuildManagers()
@@ -342,6 +359,8 @@ void D3D12App::BuildRenders()
 	sceneBounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	sceneBounds.Radius = sqrtf(10.0f * 10.0f + 15.0f * 15.0f);
 	mShadowMap->SetBoundingSphere(sceneBounds);
+
+	mSsao = std::make_unique<Ssao>(gClientWidth, gClientHeight);
 }
 
 void D3D12App::BuildFilters()
